@@ -27,7 +27,8 @@ module vin(
     output wire         v_vsync,
     output wire         v_hsync,
     output wire         v_pclk,
-    output wire [23:0]  v_pixel
+    output wire         v_de,
+    output wire [31:0]  v_pixel // 2 pixels per clock
 );
 
     wire gclk;
@@ -85,6 +86,22 @@ module vin(
         .dout(dsi_packet),
         .validout(dsi_packet_valid),
         .pktheader(dsi_packet_header)
+    );
+    
+    wire decoder_error;
+    
+    mipi_dsi_decoder(
+        .clk(gclk),
+        .rst(rst),
+        .packet(dsi_packet),
+        .packet_valid(dsi_packet_valid),
+        .packet_header(dsi_packet_header),
+        .error(decoder_error),
+        .vs(v_vsync),
+        .hs(v_hsync),
+        .pixel(v_pixel),
+        .de(v_de),
+        .valid(),
     );
 
 endmodule
