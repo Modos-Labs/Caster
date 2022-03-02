@@ -23,7 +23,7 @@ module clocking(
     input  wire clk_in,
     // Clock out ports
     output wire clk_ddr,
-    output wire clk_epd,
+    output wire clk_sys,
     // Status and control signals
     input  wire reset,
     output wire locked
@@ -103,7 +103,7 @@ module clocking(
     // MIG generates its own BUFG, no needs for buffering here
     assign clk_ddr = clkfx;
     
-    // EPD runs at input clock (33MHz)
-    assign clk_epd = clk_in_buffered;
+    // System runs at input clock (33MHz)
+    assign clk_sys = clk_in_buffered;
 
 endmodule

@@ -9,6 +9,28 @@ NET "CLK_IN"        LOC = "E8";
 NET "CLK_IN"        TNM_NET = "CLK33";
 TIMESPEC "TS_CLK33" = PERIOD "CLK33" 30 ns HIGH 50 %;
 
+
+##################################################################################
+# Timing Ignore constraints for paths crossing the clock domain 
+##################################################################################
+NET "memif/s6_ddr3/memc3_wrapper_inst/mcb_ui_top_inst/mcb_raw_wrapper_inst/selfrefresh_mcb_mode" TIG;
+NET "memif/s6_ddr3/c3_pll_lock" TIG;
+
+############################################################################
+## Memory Controller 3                               
+## Memory Device: DDR3_SDRAM->MT41J64M16XX-187E 
+## Frequency: 333.333 MHz
+## Time Period: 3000 ps
+## Supported Part Numbers: MT41J64M16LA-187E
+############################################################################
+
+############################################################################
+## Clock constraints                                                        
+############################################################################
+NET "memif/s6_ddr3/memc3_infrastructure_inst/sys_clk_ibufg" TNM_NET = "SYS_CLK3";
+TIMESPEC "TS_SYS_CLK3" = PERIOD "SYS_CLK3"  3  ns HIGH 50 %;
+############################################################################
+
 # DDR memory signals
 NET "DDR_DQ[*]"     IOSTANDARD = SSTL15_II;
 NET "DDR_DQ[*]"     IN_TERM = NONE;
@@ -123,20 +145,20 @@ NET "EPD_SDCE0"     IOSTANDARD = LVCMOS33;
 NET "EPD_SDCE0"     LOC = "J14";
 
 # MIPI
-NET "DSI_CK_P"      IOSTANDARD = LVDS25;
-NET "DSI_CK_P"      DIFF_TERM = "TRUE";
+#NET "DSI_CK_P"      IOSTANDARD = LVDS_25;
+#NET "DSI_CK_P"      DIFF_TERM = "TRUE";
 NET "DSI_CK_P"      LOC = "B10";
-NET "DSI_CK_N"      IOSTANDARD = LVDS25;
-NET "DSI_CK_N"      DIFF_TERM = "TRUE";
+#NET "DSI_CK_N"      IOSTANDARD = LVDS_25;
+#NET "DSI_CK_N"      DIFF_TERM = "TRUE";
 NET "DSI_CK_N"      LOC = "A10";
-NET "DSI_D_P[*]"    IOSTANDARD = LVDS25;
-NET "DSI_D_P[*]"    DIFF_TERM = "TRUE";
+#NET "DSI_D_P[*]"    IOSTANDARD = LVDS_25;
+#NET "DSI_D_P[*]"    DIFF_TERM = "TRUE";
 NET "DSI_D_P[0]"    LOC = "B8";
 NET "DSI_D_P[1]"    LOC = "C9";
 NET "DSI_D_P[2]"    LOC = "D8";
 NET "DSI_D_P[3]"    LOC = "D11";
-NET "DSI_D_N[*]"    IOSTANDARD = LVDS25;
-NET "DSI_D_N[*]"    DIFF_TERM = "TRUE";
+#NET "DSI_D_N[*]"    IOSTANDARD = LVDS_25;
+#NET "DSI_D_N[*]"    DIFF_TERM = "TRUE";
 NET "DSI_D_N[0]"    LOC = "A8";
 NET "DSI_D_N[1]"    LOC = "A9";
 NET "DSI_D_N[2]"    LOC = "C8";

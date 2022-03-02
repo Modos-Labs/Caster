@@ -1,3 +1,4 @@
+`default_nettype none
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: Modos
@@ -41,11 +42,9 @@ module top(
     output wire DDR_CK_N,
     inout wire DDR_RZQ,
     inout wire DDR_ZIO,
-    // Slave I2C bus
-    inout wire I2C_SDA,
-    input wire I2C_SCL,
     // Master I2C bus
-    // Not present on R0.1 hardware
+    inout wire I2C_SDA,
+    output wire I2C_SCL,
     // EPD interface
     output wire EPD_GDOE,
     output wire EPD_GDCLK,
@@ -64,19 +63,21 @@ module top(
 
     wire         top_pll_locked;
     wire         clk_ddr;
-    wire         clk_epd;
+    wire         clk_sys;
 
     clocking clocking (
         // Clock in ports
         .clk_in(CLK_IN),
         // Clock out ports
         .clk_ddr(clk_ddr),
-        .clk_epd(clk_epd),
+        .clk_sys(clk_sys),
         // Status and control signals
         .reset(1'b0),
         .locked(top_pll_locked)
      );
     
+    wire         clk_mif;
+    wire         sys_rst;
     wire         vsync;
     wire         pix_read_valid;
     wire         pix_read_ready;
@@ -84,13 +85,14 @@ module top(
     wire         pix_write_valid;
     wire         pix_write_ready;
     wire [63:0]  pix_write;
+    wire         ddr_calib_done;
 
     memif memif(
         // Clock and reset
         .clk_ddr(clk_ddr),
         .clk_ddr_locked(top_pll_locked),
         .clk_mif(clk_mif),
-        .rst_out(sys_rst),
+        .sys_rst(sys_rst),
         // DDR ram interface
         .ddr_dq(DDR_DQ),
         .ddr_a(DDR_A),
@@ -112,6 +114,7 @@ module top(
         .ddr_rzq(DDR_RZQ),
         .ddr_zio(DDR_ZIO),
         // Control interface
+        .ddr_calib_done(ddr_calib_done),
         .vsync(vsync),
         // Pixel output interface
         .pix_read(pix_read),
@@ -123,7 +126,7 @@ module top(
         .pix_write_ready(pix_write_ready)
     );
 
-    vin vin(
+    /*vin vin(
         .rst(sys_rst),
         .dsi_cp(DSI_CK_P),
         .dsi_cn(DSI_CK_N),
@@ -133,6 +136,55 @@ module top(
         .v_hsync(),
         .v_pclk(),
         .v_pixel()
+    );*/
+
+    wire pok;
+    wire error;
+    wire [2:0] dbg_state;
+    wire pwr_scl;
+    wire pwr_sda;
+
+    power power(
+        .clk(clk_sys),
+        .rst(sys_rst),
+        .en(1'b1),
+        .cen(1'b1),
+        .pok(pok),
+        .error(error),
+        .i2c_sda(pwr_sda),
+        .i2c_scl(pwr_scl),
+        .dbg_state(dbg_state)
     );
+    
+    assign I2C_SDA = pwr_sda;
+    assign I2C_SCL = pwr_scl;
+    
+    wire [35:0] chipscope_control0;
+    
+    chipscope_icon icon (
+        .CONTROL0(chipscope_control0) // INOUT BUS [35:0]
+    );
+    
+    chipscope_ila ila (
+        .CONTROL(chipscope_control0), // INOUT BUS [35:0]
+        .CLK(clk_sys),
+        .TRIG0({
+            sys_rst,
+            top_pll_locked,
+            ddr_calib_done,
+            pok,
+            error,
+            dbg_state
+        })
+    );
+    
+    assign EPD_GDOE = 1'b0;
+    assign EPD_GDCLK = 1'b0;
+    assign EPD_GDSP = 1'b0;
+    assign EPD_SDCLK = 1'b0;
+    assign EPD_SDLE = 1'b0;
+    assign EPD_SDOE = 1'b0;
+    assign EPD_SD = 16'h0;
+    assign EPD_SDCE0 = 1'b0;
 
 endmodule

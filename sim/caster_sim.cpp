@@ -1,9 +1,9 @@
 /*
- *  VerilogBoy
+ *  Caster
  *
- *  vb_sim.cpp: VerilogBoy main simulation unit
+ *  caster_sim.cpp: Caster main simulation unit
  *
- *  Copyright (C) 2019  Wenting Zhang <zephray@outlook.com>
+ *  Copyright (C) 2022  Wenting Zhang <zephray@outlook.com>
  *  Copyright (C) 2015,2017, Gisselquist Technology, LLC
  *
  *  This program is free software; you can redistribute it and/or modify it

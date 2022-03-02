@@ -1,3 +1,4 @@
+`default_nettype none
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: Modos
@@ -46,6 +47,7 @@ module memif(
     inout  wire         ddr_rzq,
     inout  wire         ddr_zio,
     // Control interface
+    output wire         ddr_calib_done,
     input  wire         vsync,
     // Pixel output interface
     output wire [63:0]  pix_read,
@@ -58,8 +60,6 @@ module memif(
     );
 
     // Clock for memory interface unit
-    wire         ddr_calib_done;
-
     wire         mig_p0_cmd_en;
     wire [2:0]   mig_p0_cmd_instr;
     wire [5:0]   mig_p0_cmd_bl;
@@ -99,7 +99,7 @@ module memif(
         .C3_MEMCLK_PERIOD(3000),
         .C3_CALIB_SOFT_IP("TRUE"),
         .C3_SIMULATION("FALSE"),
-        .C3_RST_ACT_LOW(0),
+        .C3_RST_ACT_LOW(1),
         .C3_INPUT_CLK_TYPE("SINGLE_ENDED"),
         .C3_MEM_ADDR_ORDER("ROW_BANK_COLUMN"),
         .C3_NUM_DQ_PINS(16),
@@ -110,28 +110,28 @@ module memif(
         .c3_sys_clk             (clk_ddr),
         .c3_sys_rst_n           (clk_ddr_locked),
 
-        .mcb3_dram_dq           (DDR_DQ),
-        .mcb3_dram_a            (DDR_A),
-        .mcb3_dram_ba           (DDR_BA),
-        .mcb3_dram_ras_n        (DDR_RAS_N),
-        .mcb3_dram_cas_n        (DDR_CAS_N),
-        .mcb3_dram_we_n         (DDR_WE_N),
-        .mcb3_dram_odt          (DDR_ODT),
-        .mcb3_dram_cke          (DDR_CKE),
-        .mcb3_dram_ck           (DDR_CK_P),
-        .mcb3_dram_ck_n         (DDR_CK_N),
-        .mcb3_dram_dqs          (DDR_LDQS_P),
-        .mcb3_dram_dqs_n        (DDR_LDQS_N),
-        .mcb3_dram_udqs         (DDR_UDQS_P),
-        .mcb3_dram_udqs_n       (DDR_UDQS_N),
-        .mcb3_dram_udm          (DDR_UDM),
-        .mcb3_dram_dm           (DDR_LDM),
-        .mcb3_dram_reset_n      (DDR_RESET_N),
+        .mcb3_dram_dq           (ddr_dq),
+        .mcb3_dram_a            (ddr_a),
+        .mcb3_dram_ba           (ddr_ba),
+        .mcb3_dram_ras_n        (ddr_ras_n),
+        .mcb3_dram_cas_n        (ddr_cas_n),
+        .mcb3_dram_we_n         (ddr_we_n),
+        .mcb3_dram_odt          (ddr_odt),
+        .mcb3_dram_cke          (ddr_cke),
+        .mcb3_dram_ck           (ddr_ck_p),
+        .mcb3_dram_ck_n         (ddr_ck_n),
+        .mcb3_dram_dqs          (ddr_ldqs_p),
+        .mcb3_dram_dqs_n        (ddr_ldqs_n),
+        .mcb3_dram_udqs         (ddr_udqs_p),
+        .mcb3_dram_udqs_n       (ddr_udqs_n),
+        .mcb3_dram_udm          (ddr_udm),
+        .mcb3_dram_dm           (ddr_ldm),
+        .mcb3_dram_reset_n      (ddr_reset_n),
         .c3_clk0		        (clk_mif),
         .c3_rst0		        (sys_rst),
         .c3_calib_done          (ddr_calib_done),
-        .mcb3_rzq               (DDR_RZQ),
-        .mcb3_zio               (DDR_ZIO),
+        .mcb3_rzq               (ddr_rzq),
+        .mcb3_zio               (ddr_zio),
         .c3_p0_cmd_clk          (clk_mif),
         .c3_p0_cmd_en           (mig_p0_cmd_en),
         .c3_p0_cmd_instr        (mig_p0_cmd_instr),

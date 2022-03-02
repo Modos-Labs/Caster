@@ -97,6 +97,9 @@ module caster(
 
     reg [10:0] scan_v_cnt;
     reg [10:0] scan_h_cnt;
+    
+    // Temp
+    reg [5:0] frame_counter;
 
     reg [2:0] scan_state;
     always @(posedge clk)
@@ -104,11 +107,15 @@ module caster(
             scan_state <= SCAN_IDLE;
             scan_h_cnt <= 0;
             scan_v_cnt <= 0;
+            frame_counter <= 0;
         end
         else begin
             case (scan_state)
             SCAN_IDLE: begin
-                scan_state <= SCAN_START;
+                if (frame_counter <= 6'd20) begin
+                    scan_state <= SCAN_START;
+                    frame_counter <= frame_counter + 1;
+                end
                 scan_h_cnt <= 0;
                 scan_v_cnt <= 0;
             end
@@ -169,9 +176,10 @@ module caster(
             (scan_state == SCAN_START) ? (!scan_h_cnt[4]) : (1'b1);
     assign epd_sdoe = (scan_state == SCAN_ROW_DATA) ? 
             (scan_h_cnt < H_DUTY) : (1'b0);
-    assign epd_sd = 16'b0;
+    assign epd_sd = 16'h00aa;
     // stl
     assign epd_sdce0 = (scan_state == SCAN_ROW_DATA) ? 1'b0 : 1'b1;
+    assign epd_sdle = (scan_state == SCAN_ROW_START) ? (!scan_h_cnt[1]) : (1'b0);
     assign epd_sdclk = pixclk_div[1];
     
     assign bi_ready = 0;
