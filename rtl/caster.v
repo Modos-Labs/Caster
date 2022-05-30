@@ -21,18 +21,20 @@
 module caster(
     input  wire         clk, // 4X/8X output clock rate
     input  wire         rst,
-    // New image Input, 2 pix per clock
+    input  wire         pok,
+    // New image Input, 4 pix per clock, Y4 input
+    // This input is buffered after a ASYNC FIFO
     input  wire         vin_vsync,
-    input  wire         vin_hsync,
-    input  wire         vin_de,
-    input  wire [31:0]  vin_pixel,
+    input  wire [15:0]  vin_pixel,
+    input  wire         vin_valid,
+    output wire         vin_ready,
     // Framebuffer input
     // 16 bit per pixel for state
-    input  wire [31:0]  bi_pixel,
+    input  wire [63:0]  bi_pixel,
     input  wire         bi_valid,
     output wire         bi_ready,
     // Framebuffer output
-    output wire [31:0]  bo_pixel,
+    output wire [63:0]  bo_pixel,
     output wire         bo_valid,
     // output interface couldn't handle FIFO overrun
     // EPD signals
@@ -73,35 +75,28 @@ module caster(
     
     // Screen timing
     // 800x600 timing
-    localparam PRESCAN = 47;
-    localparam V_ACTIVE = 600;
-    localparam V_OVERSCAN = 1;
-    localparam V_TOTAL = V_ACTIVE + V_OVERSCAN;
-    localparam H_FP = 2;
-    localparam H_ACTIVE = 800;
-    localparam H_BP = 2;
-    localparam H_TOTAL = H_FP + H_ACTIVE + H_BP;
-    localparam H_DUTY = 800;
+    localparam V_FP = 4; // Lines before sync with SDOE / GDOE low, GDSP high (inactive)
+    localparam V_SYNC = 1; // Lines at sync with SDOE / GDOE high, GDSP low (active)
+    localparam V_BP = 3; // Lines before data becomes active
+    localparam V_ACTIVE = 1200;
+    localparam V_TOTAL = V_FP + V_SYNC + V_BP + V_ACTIVE;
+    localparam H_FP = 10; // SDLE low (inactive), SDCE0 high (inactive), clock active
+    localparam H_SYNC = 10; // SDLE high (active), SDCE0 high (inactive), GDCLK lags by 1 clock, clock active
+    localparam H_BP = 4; // SDLE low (inactive), SDCE0 high (inactive), no clock
+    localparam H_ACTIVE = 400; // Active pixels / 4, SDCE0 low (active)
+    localparam H_TOTAL = H_FP + H_SYNC + H_BP + H_ACTIVE;
 
     // Output logic
-    localparam SCAN_IDLE = 3'd0;
-    localparam SCAN_START = 3'd1;
-    localparam SCAN_ROW_START = 3'd2;
-    localparam SCAN_ROW_DATA = 3'd3;
-    localparam SCAN_ROW_END = 3'd4;
+    localparam SCAN_IDLE = 1'b0;
+    localparam SCAN_RUNNING = 1'b1;
     
-    reg [1:0] pixclk_div;
-    always @(posedge clk)
-        pixclk_div <= pixclk_div + 2'd1;
-    wire pclk = pixclk_div == 2'b11;
-
     reg [10:0] scan_v_cnt;
     reg [10:0] scan_h_cnt;
     
     // Temp
-    reg [5:0] frame_counter;
+    reg [7:0] frame_counter;
 
-    reg [2:0] scan_state;
+    reg scan_state;
     always @(posedge clk)
         if (rst) begin
             scan_state <= SCAN_IDLE;
@@ -112,75 +107,83 @@ module caster(
         else begin
             case (scan_state)
             SCAN_IDLE: begin
-                if (frame_counter <= 6'd20) begin
-                    scan_state <= SCAN_START;
+                if ((pok) && (frame_counter < 8'd50)) begin
+                    scan_state <= SCAN_RUNNING;
                     frame_counter <= frame_counter + 1;
                 end
                 scan_h_cnt <= 0;
                 scan_v_cnt <= 0;
             end
-            SCAN_START: begin
-                if (scan_h_cnt == PRESCAN) begin
-                    scan_state <= SCAN_ROW_START;
-                    scan_h_cnt <= 0;
-                end
-                else begin
-                    scan_h_cnt <= scan_h_cnt + 1;
-                end
-            end
-            SCAN_ROW_START: begin
-                if (scan_h_cnt == H_FP) begin
-                    scan_state <= SCAN_ROW_DATA;
-                    scan_h_cnt <= 0;
-                end
-                else begin
-                    scan_h_cnt <= scan_h_cnt + 1;
-                end 
-            end
-            SCAN_ROW_DATA: begin
-                if (scan_h_cnt == H_ACTIVE) begin
-                    scan_state <= SCAN_ROW_END;
-                    scan_h_cnt <= 0;
-                end
-                else begin
-                    scan_h_cnt <= scan_h_cnt + 1;
-                end 
-            end
-            SCAN_ROW_END: begin
-                if (scan_h_cnt == H_BP) begin
-                    if (scan_v_cnt == V_TOTAL) begin
+            SCAN_RUNNING: begin
+                if (scan_h_cnt == H_TOTAL - 1) begin
+                    if (scan_v_cnt == V_TOTAL - 1) begin
                         scan_state <= SCAN_IDLE;
                     end
                     else begin
-                        scan_state <= SCAN_ROW_START;
                         scan_h_cnt <= 0;
                         scan_v_cnt <= scan_v_cnt + 1;
                     end
                 end
                 else begin
                     scan_h_cnt <= scan_h_cnt + 1;
-                end 
+                end
             end
             endcase
         end
     
+    wire scan_in_vfp = (scan_state != SCAN_IDLE) ? (
+        (scan_v_cnt < V_FP)) : 1'b0;
+    wire scan_in_vsync = (scan_state != SCAN_IDLE) ? (
+        (scan_v_cnt >= V_FP) && 
+        (scan_v_cnt < (V_FP + V_SYNC))) : 1'b0;
+    wire scan_in_vbp = (scan_state != SCAN_IDLE) ? (
+        (scan_v_cnt >= (V_FP + V_SYNC)) &&
+        (scan_v_cnt < (V_FP + V_SYNC + V_BP))) : 1'b0;
+    wire scan_in_vact = (scan_state != SCAN_IDLE) ? (
+        (scan_v_cnt >= (V_FP + V_SYNC + V_BP))) : 1'b0;
+
+    wire scan_in_hfp = (scan_state != SCAN_IDLE) ? (
+        (scan_h_cnt < H_FP)) : 1'b0;
+    wire scan_in_hsync = (scan_state != SCAN_IDLE) ? (
+        (scan_h_cnt >= H_FP) &&
+        (scan_h_cnt < (H_FP + H_SYNC))) : 1'b0;
+    wire scan_in_hbp = (scan_state != SCAN_IDLE) ? (
+        (scan_h_cnt >= (H_FP + H_SYNC)) &&
+        (scan_h_cnt < (H_FP + H_SYNC + H_BP))) : 1'b0;
+    wire scan_in_hact = (scan_state != SCAN_IDLE) ? (
+        (scan_h_cnt >= (H_FP + H_SYNC + H_BP))) : 1'b0;
+
+    wire scan_in_act = scan_in_vact && scan_in_hact;
+
+    // image gen
+    wire [7:0] current_pixel = (frame_counter < 8'd10) ? 8'h55 : //
+        ((frame_counter < 8'd20) ? 8'haa : (
+        ((frame_counter < 8'd30) ? 8'h55 : (
+        ((frame_counter < 8'd40) ? 8'haa : (//
+        (scan_h_cnt[1] ^ scan_v_cnt[3]) ? 8'h55 : 8'h00))))));
+
     // mode
-    assign epd_gdoe = (scan_state == SCAN_IDLE) ? 1'b0 : 1'b1;
+    assign epd_gdoe = (scan_in_vsync || scan_in_vbp || scan_in_vact) ? 1'b1 : 1'b0;
     // ckv
-    assign epd_gdclk = 
-            (scan_state == SCAN_START) ? (scan_h_cnt[3]) : (
-            (scan_state == SCAN_ROW_END) ? (scan_h_cnt[1]) : (
-            (scan_state == SCAN_IDLE) ? (1'b0) : (1'b1)));
+    wire epd_gdclk_pre = (scan_in_hsync || scan_in_hbp || scan_in_hact) ? 1'b1 : 1'b0;
+    reg epd_gdclk_delay;
+    always @(posedge clk)
+        epd_gdclk_delay <= epd_gdclk_pre;
+    assign epd_gdclk = epd_gdclk_delay;
+    
     // spv
-    assign epd_gdsp =
-            (scan_state == SCAN_START) ? (!scan_h_cnt[4]) : (1'b1);
-    assign epd_sdoe = (scan_state == SCAN_ROW_DATA) ? 
-            (scan_h_cnt < H_DUTY) : (1'b0);
-    assign epd_sd = 16'h00aa;
+    assign epd_gdsp = (scan_in_vsync) ? 1'b0 : 1'b1;
+    assign epd_sdoe = epd_gdoe;
+            
+    /*assign epd_sd = (frame_counter < 8'd40) ? 16'h0055 : //
+        ((frame_counter < 8'd80) ? 16'h00aa : ( //
+        (scan_h_cnt[1] ^ scan_v_cnt[3]) ? 16'h0055 : 16'h00aa)); // pattern*/
+    /*assign epd_sd = (frame_counter[2]) ? 16'h0055 : 16'h00aa;*/
+    assign epd_sd = {8'd0, current_pixel};
     // stl
-    assign epd_sdce0 = (scan_state == SCAN_ROW_DATA) ? 1'b0 : 1'b1;
-    assign epd_sdle = (scan_state == SCAN_ROW_START) ? (!scan_h_cnt[1]) : (1'b0);
-    assign epd_sdclk = pixclk_div[1];
+    assign epd_sdce0 = (scan_in_act) ? 1'b0 : 1'b1;
+    assign epd_sdle = (scan_in_hsync) ? 1'b1 : 1'b0;
+    assign epd_sdclk = (scan_in_hfp || scan_in_hsync || scan_in_hact) ? clk : 1'b0;
     
     assign bi_ready = 0;
     assign bo_pixel = 0;

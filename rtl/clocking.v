@@ -103,6 +103,16 @@ module clocking(
     // MIG generates its own BUFG, no needs for buffering here
     assign clk_ddr = clkfx;
     
+    /*wire clk_3m;
+    clk_div #(.WIDTH(4), .DIV(10)) clk_div(
+        .i(clk_in_buffered),
+        .o(clk_3m)
+    );
+   
+    BUFG clksys_buf (
+        .O (clk_sys),
+        .I (clk_3m)
+    );*/
     // System runs at input clock (33MHz)
     assign clk_sys = clk_in_buffered;
 

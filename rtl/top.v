@@ -159,6 +159,29 @@ module top(
     assign I2C_SDA = pwr_sda;
     assign I2C_SCL = pwr_scl;
     
+    caster caster(
+        .clk(clk_sys),
+        .rst(sys_rst),
+        .pok(pok),
+        .vin_vsync(1'b0),
+        .vin_hsync(1'b0),
+        .vin_de(1'b0),
+        .vin_pixel(0),
+        .bi_pixel(0),
+        .bi_valid(0),
+        .bi_ready(),
+        .bo_pixel(),
+        .bo_valid(),
+        .epd_gdoe(EPD_GDOE),
+        .epd_gdclk(EPD_GDCLK),
+        .epd_gdsp(EPD_GDSP),
+        .epd_sdclk(EPD_SDCLK),
+        .epd_sdle(EPD_SDLE),
+        .epd_sdoe(EPD_SDOE),
+        .epd_sd(EPD_SD),
+        .epd_sdce0(EPD_SDCE0)
+    );
+    
     wire [35:0] chipscope_control0;
     
     chipscope_icon icon (
@@ -177,14 +200,5 @@ module top(
             dbg_state
         })
     );
-    
-    assign EPD_GDOE = 1'b0;
-    assign EPD_GDCLK = 1'b0;
-    assign EPD_GDSP = 1'b0;
-    assign EPD_SDCLK = 1'b0;
-    assign EPD_SDLE = 1'b0;
-    assign EPD_SDOE = 1'b0;
-    assign EPD_SD = 16'h0;
-    assign EPD_SDCE0 = 1'b0;
 
 endmodule

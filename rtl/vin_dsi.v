@@ -18,7 +18,7 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module vin(
+module vin_dsi(
     input  wire         rst,
     input  wire         dsi_cp,
     input  wire         dsi_cn,
