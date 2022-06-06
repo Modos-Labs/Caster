@@ -1,7 +1,7 @@
 ##############################################################
 #
 # Xilinx Core Generator version 14.7
-# Date: Tue Nov  9 01:53:31 2021
+# Date: Sun Jun  5 03:42:19 2022
 #
 ##############################################################
 #
@@ -12,7 +12,7 @@
 #
 ##############################################################
 #
-#  Generated from component: xilinx.com:ip:mig:3.61
+#  Generated from component: xilinx.com:ip:mig:3.92
 #
 ##############################################################
 #
@@ -36,7 +36,7 @@ SET verilogsim = true
 SET vhdlsim = false
 # END Project Options
 # BEGIN Select
-SELECT MIG family Xilinx,_Inc. 3.61
+SELECT MIG_Virtex-6_and_Spartan-6 family Xilinx,_Inc. 3.92
 # END Select
 # BEGIN Parameters
 CSET component_name=s6_ddr3
@@ -46,4 +46,4 @@ CSET xml_input_file=./s6_ddr3/user_design/mig.prj
 MISC pkg_timestamp=2013-10-13T18:46:09Z
 # END Extra information
 GENERATE
-# CRC: 67adfbcc
+# CRC: 1672fce7

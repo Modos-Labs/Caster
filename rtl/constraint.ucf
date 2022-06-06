@@ -1,6 +1,6 @@
-CONFIG VCCAUX=2.5;
+CONFIG VCCAUX=3.3;
 
-CONFIG MCB_PERFORMANCE=STANDARD;
+CONFIG MCB_PERFORMANCE= EXTENDED;
 
 # Global clock input
 NET "CLK_IN"        IOSTANDARD = LVCMOS25;
@@ -15,6 +15,7 @@ TIMESPEC "TS_CLK33" = PERIOD "CLK33" 30 ns HIGH 50 %;
 ##################################################################################
 NET "memif/s6_ddr3/memc3_wrapper_inst/mcb_ui_top_inst/mcb_raw_wrapper_inst/selfrefresh_mcb_mode" TIG;
 NET "memif/s6_ddr3/c3_pll_lock" TIG;
+INST "memif/s6_ddr3/memc3_wrapper_inst/mcb_ui_top_inst/mcb_raw_wrapper_inst/gen_term_calib.mcb_soft_calibration_top_inst/mcb_soft_calibration_inst/DONE_SOFTANDHARD_CAL*" TIG;
 
 ############################################################################
 ## Memory Controller 3                               
@@ -27,13 +28,14 @@ NET "memif/s6_ddr3/c3_pll_lock" TIG;
 ############################################################################
 ## Clock constraints                                                        
 ############################################################################
-NET "memif/s6_ddr3/memc3_infrastructure_inst/sys_clk_ibufg" TNM_NET = "SYS_CLK3";
-TIMESPEC "TS_SYS_CLK3" = PERIOD "SYS_CLK3"  3  ns HIGH 50 %;
+#NET "memif/s6_ddr3/memc3_infrastructure_inst/sys_clk" TNM_NET = "SYS_CLK3";
+#TIMESPEC "TS_SYS_CLK3" = PERIOD "SYS_CLK3"  30 ns HIGH 50 %;
 ############################################################################
 
 # DDR memory signals
 NET "DDR_DQ[*]"     IOSTANDARD = SSTL15_II;
-NET "DDR_DQ[*]"     IN_TERM = NONE;
+NET "DDR_DQ[*]"     IN_TERM = UNTUNED_SPLIT_50;
+NET "DDR_DQ[*]"     OUT_TERM = UNTUNED_50;
 NET "DDR_DQ[0]"     LOC = "K2";
 NET "DDR_DQ[1]"     LOC = "K1";
 NET "DDR_DQ[2]"     LOC = "J3";
@@ -51,6 +53,7 @@ NET "DDR_DQ[13]"    LOC = "P1";
 NET "DDR_DQ[14]"    LOC = "R2";
 NET "DDR_DQ[15]"    LOC = "R1";
 NET "DDR_A[*]"      IOSTANDARD = SSTL15_II;
+NET "DDR_A[*]"      OUT_TERM = UNTUNED_50;
 NET "DDR_A[0]"      LOC = "K5";
 NET "DDR_A[1]"      LOC = "K6";
 NET "DDR_A[2]"      LOC = "D1";
@@ -65,44 +68,60 @@ NET "DDR_A[10]"     LOC = "G6";
 NET "DDR_A[11]"     LOC = "E3";
 NET "DDR_A[12]"     LOC = "F3";
 NET "DDR_BA[*]"     IOSTANDARD = SSTL15_II;
+NET "DDR_BA[*]"     OUT_TERM = UNTUNED_50;
 NET "DDR_BA[0]"     LOC = "C3";
 NET "DDR_BA[1]"     LOC = "C2";
 NET "DDR_BA[2]"     LOC = "B1";
 NET "DDR_RAS_N"     IOSTANDARD = SSTL15_II;
+NET "DDR_RAS_N"     OUT_TERM = UNTUNED_50;
 NET "DDR_RAS_N"     LOC = "J6";
 NET "DDR_CAS_N"     IOSTANDARD = SSTL15_II;
+NET "DDR_CAS_N"     OUT_TERM = UNTUNED_50;
 NET "DDR_CAS_N"     LOC = "H5";
 NET "DDR_WE_N"      IOSTANDARD = SSTL15_II;
+NET "DDR_WE_N"      OUT_TERM = UNTUNED_50;
 NET "DDR_WE_N"      LOC = "C1";
 NET "DDR_ODT"       IOSTANDARD = SSTL15_II;
+NET "DDR_ODT"       OUT_TERM = UNTUNED_50;
 NET "DDR_ODT"       LOC = "L5";
 NET "DDR_RESET_N"   IOSTANDARD = LVCMOS15;
 NET "DDR_RESET_N"   LOC = "E4";
 NET "DDR_CKE"       IOSTANDARD = SSTL15_II;
+NET "DDR_CKE"       OUT_TERM = UNTUNED_50;
 NET "DDR_CKE"       LOC = "F4";
 NET "DDR_LDM"       IOSTANDARD = SSTL15_II;
+NET "DDR_LDM"       OUT_TERM = UNTUNED_50;
 NET "DDR_LDM"       LOC = "J4";
 NET "DDR_UDM"       IOSTANDARD = SSTL15_II;
+NET "DDR_UDM"       OUT_TERM = UNTUNED_50;
 NET "DDR_UDM"       LOC = "K3";
 NET "DDR_UDQS_P"    IOSTANDARD = DIFF_SSTL15_II;
-NET "DDR_UDQS_P"    IN_TERM = NONE;
+NET "DDR_UDQS_P"    IN_TERM = UNTUNED_SPLIT_50;
+NET "DDR_UDQS_P"    OUT_TERM = UNTUNED_50;
 NET "DDR_UDQS_P"    LOC = "N3";
 NET "DDR_UDQS_N"    IOSTANDARD = DIFF_SSTL15_II;
-NET "DDR_UDQS_N"    IN_TERM = NONE;
+NET "DDR_UDQS_N"    IN_TERM = UNTUNED_SPLIT_50;
+NET "DDR_UDQS_N"    OUT_TERM = UNTUNED_50;
 NET "DDR_UDQS_N"    LOC = "N1";
 NET "DDR_LDQS_P"    IOSTANDARD = DIFF_SSTL15_II;
-NET "DDR_LDQS_P"    IN_TERM = NONE;
+NET "DDR_LDQS_P"    IN_TERM = UNTUNED_SPLIT_50;
+NET "DDR_LDQS_P"    OUT_TERM = UNTUNED_50;
 NET "DDR_LDQS_P"    LOC = "H2";
 NET "DDR_LDQS_N"    IOSTANDARD = DIFF_SSTL15_II;
-NET "DDR_LDQS_N"    IN_TERM = NONE;
+NET "DDR_LDQS_N"    IN_TERM = UNTUNED_SPLIT_50;
+NET "DDR_LDQS_N"    OUT_TERM = UNTUNED_50;
 NET "DDR_LDQS_N"    LOC = "H1";
 NET "DDR_CK_P"      IOSTANDARD = DIFF_SSTL15_II;
+NET "DDR_CK_P"      OUT_TERM = UNTUNED_50;
 NET "DDR_CK_P"      LOC = "E2";
 NET "DDR_CK_N"      IOSTANDARD = DIFF_SSTL15_II;
+NET "DDR_CK_N"      OUT_TERM = UNTUNED_50;
 NET "DDR_CK_N"      LOC = "E1";
 NET "DDR_RZQ"       IOSTANDARD = SSTL15_II;
+NET "DDR_RZQ"       OUT_TERM = UNTUNED_50;
 NET "DDR_RZQ"       LOC = "M4";
 NET "DDR_ZIO"       IOSTANDARD = SSTL15_II;
+NET "DDR_ZIO"       OUT_TERM = UNTUNED_50;
 NET "DDR_ZIO"       LOC = "M5";
 
 # I2C signals
