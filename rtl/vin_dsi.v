@@ -19,6 +19,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////////
 module vin_dsi(
+    input  wire         clk, // 33 MHz system clock input
     input  wire         rst,
     input  wire         dsi_cp,
     input  wire         dsi_cn,
@@ -28,13 +29,13 @@ module vin_dsi(
     output wire         v_hsync,
     output wire         v_pclk,
     output wire         v_de,
-    output wire [31:0]  v_pixel // 2 pixels per clock
+    output wire [7:0]   v_pixel // 2 pixels per clock, Y4
 );
 
     wire gclk;
     wire [31:0] dsi_din_unaligned;
 
-    serdes_in serdes_in (
+    mipi_serdes_in mipi_serdes_in (
         .rst(rst),
         .cp(dsi_cp),
         .cn(dsi_cn),
@@ -89,6 +90,7 @@ module vin_dsi(
     );
     
     wire decoder_error;
+    wire [31:0] pixel;
     
     mipi_dsi_decoder(
         .clk(gclk),
@@ -99,7 +101,7 @@ module vin_dsi(
         .error(decoder_error),
         .vs(v_vsync),
         .hs(v_hsync),
-        .pixel(v_pixel),
+        .pixel(pixel),
         .de(v_de),
         .valid(),
     );

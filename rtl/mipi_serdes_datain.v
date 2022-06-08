@@ -22,7 +22,7 @@
 //   on the bus after entering HS mode. The logic may be designed to always drop
 //   the first frame received.
 //////////////////////////////////////////////////////////////////////////////////
-module serdes_datain(
+module mipi_serdes_datain(
     // Clock and reset
     input  wire         gclk,           // fabric clock
     input  wire         rst,            // reset

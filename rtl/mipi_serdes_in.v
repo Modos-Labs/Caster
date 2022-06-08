@@ -18,7 +18,7 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module serdes_in(rst, cp, cn, dp, dn, gclk, dout);
+module mipi_serdes_in(rst, cp, cn, dp, dn, gclk, dout);
     
     parameter integer LANES = 4;
     
@@ -44,7 +44,7 @@ module serdes_in(rst, cp, cn, dp, dn, gclk, dout);
     // SerDes block strobe
     wire serdes_strobe;
 
-    serdes_clkin serdes_clkin (
+    mipi_serdes_clkin mipi_serdes_clkin (
         .clk_p(dsi_cp),
         .clk_n(dsi_cn),
         .ioclk_p(ioclk_p),
@@ -57,7 +57,7 @@ module serdes_in(rst, cp, cn, dp, dn, gclk, dout);
     generate
     for (i = 0; i < D; i = i + 1)
     begin
-        serdes_datain serdes_datain (
+        mipi_serdes_datain mipi_serdes_datain (
             // Clock and reset
             .gclk(gclk),
             .rst(rst),

@@ -19,7 +19,7 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module serdes_clkin(
+module mipi_serdes_clkin(
     input  wire         clk_p,          // CKP pin
     input  wire         clk_n,          // CKN pin
     output wire         ioclk_p,        // IO clock for SerDes blocks
