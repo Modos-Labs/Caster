@@ -26,10 +26,12 @@ module tb_top;
 
 	// Inputs
 	reg CLK_IN;
-	reg DSI_CK_P;
-	reg DSI_CK_N;
-	reg [3:0] DSI_D_P;
-	reg [3:0] DSI_D_N;
+    wire LVDS_ODD_CK_P;
+    wire LVDS_ODD_CK_N;
+    wire [2:0] LVDS_ODD_P;
+    wire [2:0] LVDS_ODD_N;
+    wire [2:0] LVDS_EVEN_P;
+    wire [2:0] LVDS_EVEN_N;
 
 	// Outputs
 	wire [12:0] DDR_A;
@@ -103,6 +105,7 @@ module tb_top;
 	top #(
         .SIMULATION    ("TRUE"),
         .CALIB_SOFT_IP ("TRUE"),
+        .CLK_SOURCE    ("FPD"),
         .VIN_H_FP      (VIN_H_FP),
         .VIN_H_SYNC    (VIN_H_SYNC),
         .VIN_H_BP      (VIN_H_BP),
@@ -151,10 +154,12 @@ module tb_top;
 		.EPD_SDOE(EPD_SDOE), 
 		.EPD_SD(EPD_SD), 
 		.EPD_SDCE0(EPD_SDCE0), 
-		.DSI_CK_P(DSI_CK_P), 
-		.DSI_CK_N(DSI_CK_N), 
-		.DSI_D_P(DSI_D_P), 
-		.DSI_D_N(DSI_D_N)
+        .LVDS_ODD_CK_P(LVDS_ODD_CK_P),
+        .LVDS_ODD_CK_N(LVDS_ODD_CK_N),
+        .LVDS_ODD_P(LVDS_ODD_P),
+        .LVDS_ODD_N(LVDS_ODD_N),
+        .LVDS_EVEN_P(LVDS_EVEN_P),
+        .LVDS_EVEN_N(LVDS_EVEN_N)
 	);
     
     ddr3 # (
@@ -181,23 +186,113 @@ module tb_top;
         .tdqs_n  (),
         .odt     (DDR_ODT)
     );
+    
+    assign LVDS_ODD_CK_N = ~LVDS_ODD_CK_P;
+    assign LVDS_ODD_N = ~LVDS_ODD_P;
+    assign LVDS_EVEN_N = ~LVDS_EVEN_P;
+    
+    reg lvds_ck;
+    reg lvds_a;
+    reg lvds_b;
+    reg lvds_c;
+    assign LVDS_ODD_CK_P = lvds_ck;
+    assign LVDS_ODD_P[0] = lvds_a;
+    assign LVDS_ODD_P[1] = lvds_b;
+    assign LVDS_ODD_P[2] = lvds_c;
+    assign LVDS_EVEN_P[0] = lvds_a;
+    assign LVDS_EVEN_P[1] = lvds_b;
+    assign LVDS_EVEN_P[2] = lvds_c;
+    
+    task sendlvds;
+        input hsync;
+        input vsync;
+        input de;
+        input [5:0] r;
+        input [5:0] g;
+        input [5:0] b;
+
+        begin
+            lvds_a = g[0];
+            lvds_b = b[1];
+            lvds_c = de;
+            lvds_ck = 1;
+            #1.76;
+            lvds_a = r[5];
+            lvds_b = b[0];
+            lvds_c = vsync;
+            lvds_ck = 1;
+            #1.76; 
+            lvds_a = r[4];
+            lvds_b = g[5];
+            lvds_c = hsync;
+            lvds_ck = 0;
+            #1.76;
+            lvds_a = r[3];
+            lvds_b = g[4];
+            lvds_c = b[5];
+            lvds_ck = 0;
+            #1.76;
+            lvds_a = r[2];
+            lvds_b = g[3];
+            lvds_c = b[4];
+            lvds_ck = 0;
+            #1.76;
+            lvds_a = r[1];
+            lvds_b = g[2];
+            lvds_c = b[3];
+            lvds_ck = 1;
+            #1.76;
+            lvds_a = r[0];
+            lvds_b = g[1];
+            lvds_c = b[2];
+            lvds_ck = 1;
+            #1.76;
+        end
+    endtask
+    
+    task sendline;
+        input vsync;
+        input valid;
+        begin: sendline_task
+            integer i;
+            for (i = 0; i < VIN_H_FP; i = i + 1)
+                sendlvds(0, vsync, 0, 0, 0, 0);
+            for (i = 0; i < VIN_H_SYNC; i = i + 1)
+                sendlvds(1, vsync, 0, 0, 0, 0);
+            for (i = 0; i < VIN_H_BP; i = i + 1)
+                sendlvds(0, vsync, 0, 0, 0, 0);
+            for (i = 0; i < VIN_H_ACT; i = i + 1)
+                sendlvds(0, vsync, valid, i, i, i);
+        end
+    endtask
+
+    task sendframe;
+        begin: sendframe_task
+            integer i;
+            for (i = 0; i < VIN_V_FP; i = i + 1)
+                sendline(0, 0);
+            for (i = 0; i < VIN_V_SYNC; i = i + 1)
+                sendline(1, 0);
+            for (i = 0; i < VIN_V_BP; i = i + 1)
+                sendline(0, 0);
+            for (i = 0; i < VIN_V_ACT; i = i + 1)
+                sendline(0, 1);
+        end
+    endtask
 
 	initial begin
 		// Initialize Inputs
 		CLK_IN = 0;
-		DSI_CK_P = 0;
-		DSI_CK_N = 0;
-		DSI_D_P = 0;
-		DSI_D_N = 0;
-
-		#15;
+		//#15;
+        #6;
     
 		// Add stimulus here
         while (1) begin
-            CLK_IN = 1;
+            /*CLK_IN = 1;
             #15;
             CLK_IN = 0;
-            #15;
+            #15;*/
+            sendframe();
         end
 	end
       

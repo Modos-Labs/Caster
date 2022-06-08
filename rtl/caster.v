@@ -45,16 +45,16 @@ module caster(
     output wire         epd_sdclk,
     output wire         epd_sdle,
     output wire         epd_sdoe,
-    output wire [15:0]  epd_sd,
+    output wire [7:0]   epd_sd,
     output wire         epd_sdce0
     );
 
     // Screen timing
     // Timing starts when VS is detected
     // FP + SYNC + BP should add up to around 49
-    parameter V_FP = 44; // Lines before sync with SDOE / GDOE low, GDSP high (inactive)
+    parameter V_FP = 45; // Lines before sync with SDOE / GDOE low, GDSP high (inactive)
     parameter V_SYNC = 1; // Lines at sync with SDOE / GDOE high, GDSP low (active)
-    parameter V_BP = 3; // Lines before data becomes active
+    parameter V_BP = 2; // Lines before data becomes active
     parameter V_ACT = 1200;
     localparam V_TOTAL = V_FP + V_SYNC + V_BP + V_ACT;
     // FP + SYNC + BP should add up to 140
@@ -75,7 +75,7 @@ module caster(
     localparam OP_NORMAL = 2'd1; // Normal operation
     localparam OP_CLEAR_NORMAL = 2'd2; // In place screen clear
 
-    localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 80 : 2; // 80 frames, (black, white)x2
+    localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 340 : 2; // 240 frames, (black, white)x4
 
     // Internal design specific
     localparam VS_DELAY = 8; // wait 8 clocks after VS is vaild
@@ -210,18 +210,28 @@ module caster(
             wire [5:0] pixel_framecnt = proc_bi[9:4];
             wire [3:0] pixel_prev = proc_bi[3:0];
             wire [5:0] pixel_framecnt_dec = pixel_framecnt - 1;
+            wire [5:0] pixel_framecnt_2w = FASTM_B2W_FRAMES - pixel_framecnt + 2;
+            wire [5:0] pixel_framecnt_2b = FASTM_W2B_FRAMES - pixel_framecnt + 2;
 
             assign proc_output =
                 (op_state == OP_INIT) ? (
                     // Init state
-                    (op_framecount < 11'd18) ? 2'b01 :
-                    (op_framecount < 11'd20) ? 2'b00 :
-                    (op_framecount < 11'd38) ? 2'b10 :
-                    (op_framecount < 11'd40) ? 2'b00 :
-                    (op_framecount < 11'd58) ? 2'b01 :
-                    (op_framecount < 11'd60) ? 2'b00 :
-                    (op_framecount < 11'd78) ? 2'b10 :
-                                               2'b00
+                    (op_framecount < 11'd48) ? 2'b01 :
+                    (op_framecount < 11'd50) ? 2'b00 :
+                    (op_framecount < 11'd108) ? 2'b10 :
+                    (op_framecount < 11'd110) ? 2'b00 :
+                    (op_framecount < 11'd178) ? 2'b01 :
+                    (op_framecount < 11'd180) ? 2'b00 :
+                    (op_framecount < 11'd258) ? 2'b10 :
+                    (op_framecount < 11'd260) ? 2'b00 :
+                    (op_framecount < 11'd278) ? 2'b01 :
+                    (op_framecount < 11'd280) ? 2'b00 :
+                    (op_framecount < 11'd298) ? 2'b10 :
+                    (op_framecount < 11'd300) ? 2'b00 :
+                    (op_framecount < 11'd318) ? 2'b01 :
+                    (op_framecount < 11'd320) ? 2'b00 :
+                    (op_framecount < 11'd338) ? 2'b10 :
+                                                2'b00
                 ) : ((op_state == OP_NORMAL) ? (
                     // Normal state
                     (pixel_mode == MODE_NORMAL_LUT) ? (
@@ -232,7 +242,9 @@ module caster(
                         (pixel_framecnt != 0) ? (
                             // Currently updating
                             // For now, just continue
-                            pixel_prev[0] ? 2'b10 : 2'b01
+                            //pixel_prev[0] ? 2'b10 : 2'b01
+                            // Or, respond to input!
+                            proc_vin[3] ? 2'b10 : 2'b01
                         ) : (
                             // Currently not updating
                             (proc_vin[3] == pixel_prev[0]) ? (
@@ -260,7 +272,17 @@ module caster(
                         (pixel_framecnt != 0) ? (
                             // Currently updating
                             // For now, just continue
-                            {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]}
+                            //{proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]}
+                            // Respond to input!
+                            (proc_vin[3] == pixel_prev[0]) ? (
+                                // Pixel state did not change, continue
+                                {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]}
+                            ) : (
+                                // Pixel state changed, update
+                                proc_vin[3] ? (
+                                    {proc_bi[15:10], pixel_framecnt_2w, 4'd1}
+                                ) : {proc_bi[15:10], pixel_framecnt_2b, 4'd0}
+                            )
                         ) : (
                             // Currently not updating
                             (proc_vin[3] == pixel_prev[0]) ? (
@@ -283,8 +305,10 @@ module caster(
         end
     endgenerate
     reg [7:0] current_pixel;
+    reg output_mask;
     always @(posedge clk) begin
-        current_pixel <= pixel_comb;
+        output_mask <= proc_in_act;
+        current_pixel <= (proc_in_act) ? pixel_comb : 8'h00;
         bo_pixel <= bo_pixel_comb;
     end
 
@@ -309,7 +333,7 @@ module caster(
     assign epd_gdsp = (scan_in_vsync) ? 1'b0 : 1'b1;
     assign epd_sdoe = epd_gdoe;
 
-    assign epd_sd = {8'd0, current_pixel};
+    assign epd_sd = current_pixel;
     // stl
     assign epd_sdce0 = (scan_in_act) ? 1'b0 : 1'b1;
     assign epd_sdle = (scan_in_hsync) ? 1'b1 : 1'b0;

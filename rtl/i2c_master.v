@@ -101,7 +101,9 @@ localparam [3:0] IDLE        = 4'd0,
                  
 //Modify These Parameters for other targets
 //localparam [15:0] DIV_100MHZ = 16'd125;         //desire 400KHz, have 100MHz, thus (1/(400*10^3)*100*10^6)/2, note div by 2 is for need to change in cycle
-localparam [15:0] DIV_100MHZ = 16'd167;   // 100kHz at 33.3MHz
+//localparam [15:0] DIV_100MHZ = 16'd167;   // 100kHz at 33.3MHz
+//localparam [15:0] DIV_100MHZ = 16'd208;   // 100kHz at 41.7MHz
+localparam [15:0] DIV_100MHZ = 16'd405; // 100kHz at 81MHz
 localparam [7:0]  START_IND_SETUP  = 70,  //Time before negedge of scl
                   START_IND_HOLD   = 60,  //Time after posedge of clock when start occurs (not used)
                   DATA_SETUP_TIME  =  2,  //Time needed before posedge of scl 

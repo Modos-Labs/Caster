@@ -24,6 +24,7 @@ module memif(
     // Clock and reset
     input  wire         clk_sys,
     output wire         clk_mif,
+    input  wire         rst_in,
     output wire         sys_rst,
     // DDR RAM interface
     inout  wire [15:0]  ddr_dq,
@@ -69,12 +70,6 @@ module memif(
     localparam BYTE_PER_WORD = 16; // 128 bit bus
     localparam BURST_LENGTH = 16; // Should be at least 2
     localparam BYTE_PER_CMD = BYTE_PER_WORD * BURST_LENGTH;
-
-    reg c3_sys_rst = 1'b1;
-    
-    always @(posedge clk_sys) begin
-        c3_sys_rst <= 1'b0;
-    end
     
     reg          mig_p0_cmd_en;
     reg  [2:0]   mig_p0_cmd_instr;
@@ -122,7 +117,7 @@ module memif(
     )
     s6_ddr3 (
         .c3_sys_clk             (clk_sys),
-        .c3_sys_rst_i           (c3_sys_rst),
+        .c3_sys_rst_i           (rst_in),
 
         .mcb3_dram_dq           (ddr_dq),
         .mcb3_dram_a            (ddr_a),

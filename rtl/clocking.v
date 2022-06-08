@@ -101,7 +101,11 @@ module clocking(
     );
 
     // MIG generates its own BUFG, no needs for buffering here
-    assign clk_ddr = clkfx;
+    BUFG clkddr_buf (
+        .O (clk_ddr),
+        .I (clkfx)
+    );
+    //assign clk_ddr = clkfx;
     
     /*wire clk_3m;
     clk_div #(.WIDTH(4), .DIV(10)) clk_div(

@@ -16,7 +16,8 @@ module power(
 );
 
     // TODO: Allow adjustable VCOM
-    localparam VCOM_VAL = 8'd143; // -0.5 - 1.43 = -1.93V
+    //localparam VCOM_VAL = 8'd143; // -0.5 - 1.43 = -1.93V
+    localparam VCOM_VAL = 8'd162; // -0.5 - 1.62 = -2.12V
     localparam I2C_ADDR = 7'h48;
 
     reg i2c_rw;

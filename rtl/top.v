@@ -55,14 +55,19 @@ module top(
     output wire [15:0] EPD_SD,
     output wire EPD_SDCE0,
     // MIPI interface 
-    input wire DSI_CK_P,
-    input wire DSI_CK_N,
-    input wire [3:0] DSI_D_P,
-    input wire [3:0] DSI_D_N
+    input wire LVDS_ODD_CK_P,
+    input wire LVDS_ODD_CK_N,
+    input wire [2:0] LVDS_ODD_P,
+    input wire [2:0] LVDS_ODD_N,
+    input wire [2:0] LVDS_EVEN_P,
+    input wire [2:0] LVDS_EVEN_N
     );
     
     parameter SIMULATION = "FALSE";
     parameter CALIB_SOFT_IP = "TRUE";
+    parameter CLK_SOURCE = "DCM"; // Possible values: DDR, FPD, DCM
+    // Remember to change clock multiplier in DDR3 unit
+    // 2 for DCM, 8 for FPD, 20 for DDR
     
     // Horizontal
     // All numbers are divided by 2
@@ -79,18 +84,54 @@ module top(
     parameter VIN_V_SYNC  = 3;    //Sync
     parameter VIN_V_BP    = 46;   //Back porch
     parameter VIN_V_ACT   = 1200; //Active lines
-    parameter EPDC_V_FP   = 44;
+    parameter EPDC_V_FP   = 45;
     parameter EPDC_V_SYNC = 1;
-    parameter EPDC_V_BP   = 3;
+    parameter EPDC_V_BP   = 2;
     parameter EPDC_V_ACT  = 1200;
 
     // System clocking
     wire clk_sys;
     wire sys_rst;
-    IBUFG clkin1_buf (
-        .O (clk_sys),
-        .I (CLK_IN)
-    );
+    
+    wire clk_ddr;
+    wire mif_rst;
+    
+    generate
+    if (CLK_SOURCE == "DCM") begin: clocking_dcm
+        wire pll_locked;
+        clocking clocking (
+            .clk_in(CLK_IN),
+            .clk_ddr(clk_ddr),
+            .clk_sys(clk_sys),
+            .reset(1'b0),
+            .locked(pll_locked)
+        );
+        assign mif_rst = !pll_locked;
+    end
+    else if (CLK_SOURCE == "DDR") begin: clocking_ddr
+        reg c3_sys_rst = 1'b1;
+        always @(posedge clk_sys) begin
+            c3_sys_rst <= 1'b0;
+        end
+        
+        IBUFG clkin1_buf (
+            .O (clk_sys),
+            .I (CLK_IN)
+        );
+        assign clk_ddr = clk_sys;
+        assign mif_rst = c3_sys_rst;
+    end
+    else if (CLK_SOURCE == "FPD") begin: clocking_lvds
+        reg c3_sys_rst = 1'b1;
+        always @(posedge clk_sys) begin
+            c3_sys_rst <= 1'b0;
+        end
+   
+        assign clk_sys = v_pclk;
+        assign clk_ddr = v_pclk;
+        assign mif_rst = c3_sys_rst;
+    end
+    endgenerate
 
     // Global frame trigger
     wire b_trigger;
@@ -99,7 +140,7 @@ module top(
     wire v_vs, v_hs, v_de, v_pclk;
     wire [7:0] v_pixel;
     
-    vin_internal #(
+    /*vin_internal #(
         .H_FP(VIN_H_FP),
         .H_SYNC(VIN_H_SYNC),
         .H_BP(VIN_H_BP),
@@ -111,6 +152,21 @@ module top(
     ) vin(
         .clk(clk_sys),
         .rst(sys_rst),
+        .v_vsync(v_vs),
+        .v_hsync(v_hs),
+        .v_pclk(v_pclk),
+        .v_de(v_de),
+        .v_pixel(v_pixel)
+    );*/
+    vin_fpdlink vin_fpdlink(
+        .clk(clk_sys),
+        .rst(sys_rst),
+        .fpdlink_cp(LVDS_ODD_CK_P),
+        .fpdlink_cn(LVDS_ODD_CK_N),
+        .fpdlink_odd_p(LVDS_ODD_P),
+        .fpdlink_odd_n(LVDS_ODD_N),
+        .fpdlink_even_p(LVDS_EVEN_P),
+        .fpdlink_even_n(LVDS_EVEN_N),
         .v_vsync(v_vs),
         .v_hsync(v_hs),
         .v_pclk(v_pclk),
@@ -175,8 +231,9 @@ module top(
     )
     memif(
         // Clock and reset
-        .clk_sys(clk_sys),
+        .clk_sys(clk_ddr),
         .clk_mif(clk_mif),
+        .rst_in(mif_rst),
         .sys_rst(sys_rst),
         // DDR ram interface
         .ddr_dq(DDR_DQ),
@@ -347,7 +404,7 @@ module top(
         .epd_sdclk(EPD_SDCLK),
         .epd_sdle(EPD_SDLE),
         .epd_sdoe(EPD_SDOE),
-        .epd_sd(EPD_SD),
+        .epd_sd(EPD_SD[7:0]),
         .epd_sdce0(EPD_SDCE0)
     );
     
@@ -368,5 +425,13 @@ module top(
             5'b0
         })
     );
+    
+    assign EPD_SD[15:8] = {
+        v_vs,
+        v_hs,
+        v_pclk,
+        v_de,
+        v_pixel
+    };
 
 endmodule
