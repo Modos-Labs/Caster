@@ -34,6 +34,7 @@ module vin_fpdlink(
     output wire         v_de,
     output wire [7:0]   v_pixel // 2 pixels per clock, Y4
 );
+    parameter COLORMODE = "DES";
 
     wire gclk;
     wire [41:0] fpdlink_din;
@@ -60,8 +61,50 @@ module vin_fpdlink(
     wire [3:0] y_odd;
     wire [3:0] y_even;
     
-    rgb2y rgb2y_odd (.r(r_odd), .g(g_odd), .b(b_odd), .y(y_odd));
-    rgb2y rgb2y_even (.r(r_even), .g(g_even), .b(b_even), .y(y_even));
+    generate
+    if (COLORMODE=="MONO") begin: color_mono
+        rgb2y rgb2y_odd (.r(r_odd), .g(g_odd), .b(b_odd), .y(y_odd));
+        rgb2y rgb2y_even (.r(r_even), .g(g_even), .b(b_even), .y(y_even));
+    end
+    else if (COLORMODE=="DES") begin: color_des
+        reg [1:0] c_cnt_x;
+        reg [1:0] c_cnt_y;
+        reg hs_last;
+        reg first_line;
+        always @(posedge v_pclk) begin
+            hs_last <= v_hsync;
+            if (!hs_last && v_hsync) begin
+                if (v_vsync) begin
+                    c_cnt_y <= 2'd1;
+                    c_cnt_x <= 2'd0;
+                    first_line <= 1'b1;
+                end
+                else if (!first_line) begin
+                    c_cnt_x <= c_cnt_y;
+                    if (c_cnt_y == 2'd2) begin
+                        c_cnt_y <= 2'd0;
+                    end
+                    else begin
+                        c_cnt_y <= c_cnt_y + 1;
+                    end
+                end
+            end
+            else if (v_de) begin
+                first_line <= 1'b0;
+                if (c_cnt_x == 2'd2) begin
+                    c_cnt_x <= 2'd0;
+                end
+                else begin
+                    c_cnt_x <= c_cnt_x + 1;
+                end
+            end
+        end
+        assign y_odd = (c_cnt_x == 2'd0) ? (b_odd[5:2]) :
+                (c_cnt_x == 2'd1) ? (r_odd[5:2]) : (g_odd[5:2]);
+        assign y_even = (c_cnt_x == 2'd0) ? (r_even[5:2]) :
+                (c_cnt_x == 2'd1) ? (g_even[5:2]) : (b_even[5:2]);
+    end
+    endgenerate
     
     wire vsync = fpdlink_din[26];
     reg last_vsync;
