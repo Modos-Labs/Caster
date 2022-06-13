@@ -22,10 +22,6 @@
 //
 #pragma once
 
-constexpr int DISP_WIDTH = 160;
-constexpr int DISP_HEIGHT = 120;
-
-void dispsim_reset();
-void dispsim_apply(uint32_t *pixels, const uint8_t gdoe,
-        const uint8_t gdclk, const uint8_t gdsp, const uint8_t sdle,
-        const uint8_t sdoe, const uint8_t sd, const uint8_t sdce0);
+void srcsim_reset();
+void srcsim_apply(uint8_t &vsync, uint16_t &pixel, uint8_t &valid,
+        const uint8_t ready);

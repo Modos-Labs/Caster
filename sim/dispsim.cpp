@@ -1,162 +1,89 @@
-/*
- *  Caster
- *  
- *  dispsim.cpp: Display simulation unit
- * 
- *  Copyright (C) 2022  Wenting Zhang <zephray@outlook.com>
- *
- *  This program is free software; you can redistribute it and/or modify it
- *  under the terms and conditions of the GNU General Public License as 
- *  published by the Free Software Foundation, either version 3 of the license,
- *  or (at your option) any later version.
- *
- *  This program is distributed in the hope it will be useful, but WITHOUT
- *  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- *  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- *  more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, see <http://www.gnu.org/licenses/> for a copy.
- */
-#include <SDL.h>
+//
+// Caster simulator
+// Copyright 2021 Wenting Zhang
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+#include <stdio.h>
+#include <stdint.h>
 #include "dispsim.h"
 
-DISPSIM::DISPSIM(void) {
-    window = SDL_CreateWindow("Caster Simulation", 
-            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-            dispWidth, dispHeight, SDL_SWSURFACE);
+static int x_counter;
+static int y_counter;
+static int last_hs;
 
-    if (window == NULL) {
-        fprintf(stderr, "Unable to create window\n");
-        return;
+void render_copy(); // Function in main.cpp
+
+void dispsim_set_pixel(uint32_t *pixels, int x, int y, uint8_t input) {
+    uint32_t pixel = pixels[y * DISP_WIDTH + x] & 0xff;
+    if (input == 1) {
+        // black
+        if (pixel > 28)
+            pixel -= 28;
+        else
+            pixel = 0;
     }
-
-    renderer = SDL_CreateRenderer(window, -1, 
-            SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-
-    if (renderer == NULL)
-    {
-        fprintf(stderr, "Unable to create renderer\n");
-        return;
+    else if (input == 2) {
+        // white
+        if (pixel < 227)
+            pixel += 28;
+        else
+            pixel = 255;
     }
-
-    screen = SDL_CreateRGBSurface(SDL_SWSURFACE, contentWidth, contentHeight, 32,
-            0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
-
-    textureRect.x = textureRect.y = 0;
-    textureRect.w = contentWidth; 
-    textureRect.h = contentHeight;
-
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, 
-            SDL_TEXTUREACCESS_STREAMING, contentWidth, contentHeight);
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-
-    if (screen == NULL || texture == NULL)
-    {
-        fprintf(stderr, "Unable to allocate framebuffer or texture\n");
-        return;
-    }
-
-    xCounter = 0;
-    yCounter = 0;
-
-    SDL_FillRect(screen, &textureRect, 0xFF0000FF);
-    renderCopy();
-    
-    tick = SDL_GetTicks();
+    // otherwise, nop
+    pixels[y * DISP_WIDTH + x] = pixel | (pixel << 8) | (pixel << 16) | 0xff000000ul;
 }
 
-DISPSIM::~DISPSIM(void) {
-    if (screen != NULL)
-    {
-        SDL_FreeSurface(screen);
-    }
-
-    if (texture)
-    {
-	    SDL_DestroyTexture(texture);
-    }
-
-    if (renderer)
-    {
-        SDL_DestroyRenderer(renderer);
-    }
-
-    if (window)
-    {
-        SDL_DestroyWindow(window);
-    }
+void dispsim_reset() {
+    x_counter = 0;
+    y_counter = 0;
+    last_hs = 0;
 }
 
-void DISPSIM::apply(const unsigned char lcd_data, const unsigned char lcd_hs, 
-            const unsigned char lcd_vs, const unsigned char lcd_enable) {
-    if (!last_hs && lcd_hs) {
-        xCounter = 0;
-        yCounter ++;
+void dispsim_apply(uint32_t *pixels, const uint8_t gdoe,
+        const uint8_t gdclk, const uint8_t gdsp, const uint8_t sdle,
+        const uint8_t sdoe, const uint8_t sd, const uint8_t sdce0) {
+    // SDLE = Hsync
+    // GDSP = ~ Vsync
+    // SDCE0 = ~ DE
+    uint8_t hs = sdle;
+    uint8_t vs = !gdsp;
+    uint8_t de = !sdce0;
+
+    if (!last_hs && hs) {
+        x_counter = 0;
+        if (vs) {
+            y_counter = 0;
+            printf("VOUT FS\n");
+            render_copy();
+        }
+        else {
+            y_counter++;
+        }
     }
-    if (!last_vs && lcd_vs) {
-        // Verical sync can happen at the same time.
-        yCounter = 0;
+
+    if (de) {
+        dispsim_set_pixel(pixels, x_counter++, y_counter, (sd >> 6) & 0x3);
+        dispsim_set_pixel(pixels, x_counter++, y_counter, (sd >> 4) & 0x3);
+        dispsim_set_pixel(pixels, x_counter++, y_counter, (sd >> 2) & 0x3);
+        dispsim_set_pixel(pixels, x_counter++, y_counter, (sd >> 0) & 0x3);
     }
-    if (lcd_enable) {
-        xCounter ++;
-        setPixel(xCounter - HBP, yCounter - VBP, colorMap(lcd_data));
-    }
 
-    last_vs = lcd_vs;
-    last_hs = lcd_hs;
-
-    if ((SDL_GetTicks() - tick) > REFRESH_INTERVAL) {
-        renderCopy();
-        tick = SDL_GetTicks();
-    }
-}
-
-void DISPSIM::set_title(char *title) {
-    SDL_SetWindowTitle(window, title);
-}
-
-void DISPSIM::renderCopy(void) {
-	void *texturePixels;
-	int texturePitch;
-
-	SDL_LockTexture(texture, NULL, &texturePixels, &texturePitch);
-	memset(texturePixels, 0, textureRect.y * texturePitch);
-	uint8_t *pixels = (uint8_t *)texturePixels + textureRect.y * texturePitch;
-	uint8_t *src = (uint8_t *)screen->pixels;
-	int leftPitch = textureRect.x << 2;
-	int rightPitch = texturePitch - ((textureRect.x + textureRect.w) << 2);
-	for (int y = 0; y < textureRect.h; y++, src += screen->pitch)
-	{
-		memset(pixels, 0, leftPitch); pixels += leftPitch;
-		memcpy(pixels, src, contentWidth << 2); pixels += contentWidth << 2;
-		memset(pixels, 0, rightPitch); pixels += rightPitch;
-	}
-	memset(pixels, 0, textureRect.y * texturePitch);
-	SDL_UnlockTexture(texture);
-
-	SDL_RenderClear(renderer);
-	SDL_RenderCopy(renderer, texture, NULL, NULL);
-	SDL_RenderPresent(renderer);
-}
-
-void DISPSIM::setPixel(int x, int y, unsigned long pixel) {
-    uint32_t *pixels = (uint32_t *)screen->pixels;
-    if ((x < 0) || (y < 0) || (x >= contentWidth) || (y >= contentHeight))
-        return;
-    pixels[y * contentWidth + x] = pixel;
-}
-
-unsigned long DISPSIM::colorMap(unsigned char pixel) {
-    if (pixel == 3) 
-        return 0xff212f25;
-    else if (pixel == 2)
-        return 0xff32513a;
-    else if (pixel == 1)
-        return 0xff658635;
-    else if (pixel == 0)
-        return 0xff8b9a26;
-    else
-        // how???
-        return 0xffffffff;
+    last_hs = hs;
 }

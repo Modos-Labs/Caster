@@ -6,4 +6,6 @@ Part of the board level RTL design is adapted from Gaurav Singh www.circuitvalle
 
 The I2C master implementation, which is part of the board level RTL design, is adapted from github.com chance189/I2C_Master.
 
-Simulation code are licensed under GNU GPL 2.0.
+Certain target specific IP cores including DDR memory controller, asynchronous FIFO, and PLL are provided by Xilinx and licensed sepearately with use of Xilinx tools. They are not covered under the CERN-OHL-P license.
+
+Simulation code are licensed under MIT.

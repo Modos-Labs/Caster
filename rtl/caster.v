@@ -51,17 +51,15 @@ module caster(
 
     // Screen timing
     // Timing starts when VS is detected
-    // FP + SYNC + BP should add up to around 49
-    parameter V_FP = 45; // Lines before sync with SDOE / GDOE low, GDSP high (inactive)
+    parameter V_FP = 3; // Lines before sync with SDOE / GDOE low, GDSP high (inactive)
     parameter V_SYNC = 1; // Lines at sync with SDOE / GDOE high, GDSP low (active)
     parameter V_BP = 2; // Lines before data becomes active
-    parameter V_ACT = 1200;
+    parameter V_ACT = 120;
     localparam V_TOTAL = V_FP + V_SYNC + V_BP + V_ACT;
-    // FP + SYNC + BP should add up to 140
-    parameter H_FP = 10; // SDLE low (inactive), SDCE0 high (inactive), clock active
-    parameter H_SYNC = 10; // SDLE high (active), SDCE0 high (inactive), GDCLK lags by 1 clock, clock active
-    parameter H_BP = 120; // SDLE low (inactive), SDCE0 high (inactive), no clock
-    parameter H_ACT = 400; // Active pixels / 4, SDCE0 low (active)
+    parameter H_FP = 1; // SDLE low (inactive), SDCE0 high (inactive), clock active
+    parameter H_SYNC = 1; // SDLE high (active), SDCE0 high (inactive), GDCLK lags by 1 clock, clock active
+    parameter H_BP = 2; // SDLE low (inactive), SDCE0 high (inactive), no clock
+    parameter H_ACT = 40; // Active pixels / 4, SDCE0 low (active)
     localparam H_TOTAL = H_FP + H_SYNC + H_BP + H_ACT;
     
     parameter SIMULATION = "FALSE";

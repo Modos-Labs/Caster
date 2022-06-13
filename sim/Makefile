@@ -1,67 +1,83 @@
-################################################################################
-##
-## Filename:  Makefile
-##
-## Project:	  Caster
-##
-################################################################################
-##
-## Copyright (C) 2022, Wenting Zhang
-## Copyright (C) 2015-2017, Gisselquist Technology, LLC
-##
-## This program is free software (firmware): you can redistribute it and/or
-## modify it under the terms of  the GNU General Public License as published
-## by the Free Software Foundation, either version 3 of the License, or (at
-## your option) any later version.
-##
-## This program is distributed in the hope that it will be useful, but WITHOUT
-## ANY WARRANTY; without even the implied warranty of MERCHANTIBILITY or
-## FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-## for more details.
-##
-## You should have received a copy of the GNU General Public License along
-## with this program.  If not, see <http://www.gnu.org/licenses/> for a copy.
-##
-################################################################################
+TARGET := sim
+OBJODIR := obj
+RTLDIR := ../rtl
 
-CXX	:= g++
-OBJDIR  := obj_pc
-RTLD	:= ../rtl
 ifeq ($(VERILATOR_ROOT),)
 VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
 endif
-VROOT   := $(VERILATOR_ROOT)
-GFXFLAGS:= $(shell pkg-config sdl2 --cflags)
-GFXLIBS := $(shell pkg-config sdl2 --cflags --libs)
-FLAGS	:= -Wall -Og -g -faligned-new -std=c++11
-VINCD   := $(VROOT)/include
-INCS	:= -I$(RTLD)/obj_dir/ -I$(RTLD) -I$(VINCD) -I$(VINCD)/vltstd
-OBJS    := $(OBJDIR)/caster_sim.o
-VOBJDR	:= $(RTLD)/obj_dir
-VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
-PROGRAMS := caster_sim
-all:	$(PROGRAMS)
+VROOT := $(VERILATOR_ROOT)
+VINCD := $(VROOT)/include
+RTLOBJDIR := $(RTLDIR)/obj_dir
+RTLOBJ := $(RTLOBJDIR)/Vcaster__ALL.a
 
-%.o: $(OBJDIR)/%.o
-$(OBJDIR)/%.o: %.cpp
-	$(mk-objdir)
-	$(CXX) $(FLAGS) $(GFXFLAGS) $(INCS) -c $< -o $@
+CC = g++
+CXX = g++
+LD = g++
+SDL_CONFIG = sdl2-config
 
-$(OBJDIR)/%.o: $(VINCD)/%.cpp
-	$(mk-objdir)
-	$(CXX) $(FLAGS) $(INCS) -c $< -o $@
+LIBS := -lm $(shell $(SDL_CONFIG) --libs)
 
-caster_sim: $(OBJS) $(VOBJS) $(VOBJDR)/Vcaster__ALL.a
-	$(CXX) $(GFXLIBS) $(INCS) $^ $(VOBJDR)/Vcaster__ALL.a $(GFXLIBS) -o $@
+COMMONFLAGS := \
+	$(shell $(SDL_CONFIG) --cflags) \
+	-Wall -Og -g
 
-define	mk-objdir
-	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
-endef
+CPPFLAGS := \
+	-faligned-new \
+	-std=c++17
 
-.PHONY: clean
+LDFLAGS :=
+
+INCLUDES += \
+	-I. \
+	-I$(RTLOBJDIR) \
+	-I$(RTLDIR) \
+	-I$(VINCD) \
+	-I$(VINCD)/vltstd
+
+CSRCS +=
+
+CPPSRCS += \
+	./main.cpp \
+	./dispsim.cpp \
+	./srcsim.cpp \
+	verilated.cpp \
+	verilated_vcd_c.cpp
+
+OBJS :=	$(CSRCS:%.c=$(OBJODIR)/%.o) \
+		$(CPPSRCS:%.cpp=$(OBJODIR)/%.o)
+
+OBJS += $(RTLOBJ)
+
+$(OBJODIR)/%.o: %.c
+	@echo [CC] $<
+	@mkdir -p $(dir $@)
+	@$(CC) $(COMMONFLAGS) $(CCFLAGS) $(INCLUDES) -c -o $@ $<
+
+$(OBJODIR)/%.o: %.cpp
+	@echo [CXX] $<
+	@mkdir -p $(dir $@)
+	@$(CXX) $(COMMONFLAGS) $(CPPFLAGS) $(INCLUDES) -c -o $@ $<
+
+$(OBJODIR)/%.o: $(VINCD)/%.cpp
+	@echo [CXX] $<
+	@mkdir -p $(dir $@)
+	@$(CXX) $(COMMONFLAGS) $(CPPFLAGS) $(INCLUDES) -c -o $@ $<
+
+PHONY += all
+all: $(OBJS)
+	@$(LD) $(LDFLAGS) $(OBJS) $(LIBS) -o $(TARGET)
+	@echo 'all finish'
+
+PHONY += clean
 clean:
-	rm -f *.vcd
-	rm -rf $(OBJDIR)/
-	rm -f $(PROGRAMS)
-	rm -f *.o
+	rm -rf $(OBJODIR)
+	rm -f $(TARGET)
+	@echo 'clean finish'
+
+# Declare the contents of the .PHONY variable as phony.  We keep that
+# information in a variable so we can use it in if_changed and friends.
+.PHONY: $(PHONY)
+
+# Set default target
+.DEFAULT_GOAL:= all
 
