@@ -32,8 +32,11 @@
 
 #include "dispsim.h"
 #include "srcsim.h"
+#include "vramsim.h"
 
-#define MAX_CYCLES 100000
+#define SIM_STEP 100000
+//#define MAX_CYCLES 500000
+//#define TRACE
 
 constexpr int DISP_FACTOR = 2;
 
@@ -66,12 +69,24 @@ void tick() {
         core->vin_valid,
         core->vin_ready
     );
+    vramsim_apply(
+        core->b_trigger,
+        core->bi_pixel,
+        core->bi_valid,
+        core->bi_ready,
+        core->bo_pixel,
+        core->bo_valid
+    );
     core->clk = 1;
     core->eval();
+#ifdef TRACE
     trace->dump(tickcount * 10);
+#endif
     core->clk = 0;
     core->eval();
+#ifdef TRACE
     trace->dump(tickcount * 10 + 5);
+#endif
     tickcount++;
 }
 
@@ -81,6 +96,8 @@ void reset() {
     core->rst = 0;
     dispsim_reset();
     srcsim_reset();
+    vramsim_reset();
+    core->sys_ready = 1;
 }
 
 void render_copy() {
@@ -114,7 +131,7 @@ int main(int argc, char *argv[]) {
     core = new Vcaster;
     Verilated::traceEverOn(true);
 
-#ifdef MAX_CYCLES
+#ifdef TRACE
     trace = new VerilatedVcdC;
     core->trace(trace, 99);
     trace->open("trace.vcd");
@@ -139,15 +156,37 @@ int main(int argc, char *argv[]) {
     assert(texture);
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 
-    SDL_FillRect(screen, &texture_rect, 0xFF0000FF);
+    SDL_FillRect(screen, &texture_rect, 0xFFFFFFFF);
 
     // Start simulation
     printf("Simulation start.\n");
 
     reset();
 
-    while (true) {
-        tick();
+    uint32_t ms_tick = SDL_GetTicks();
+    bool running = true;
+    while (running) {
+        for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < SIM_STEP / 10; i++) {
+                tick();
+            }
+
+            SDL_Event event;
+            if (SDL_PollEvent(&event))
+            {
+                if (event.type == SDL_QUIT)
+                {
+                    running = false;
+                }
+            }
+        }
+        
+        uint32_t ms_delta = SDL_GetTicks() - ms_tick;
+        char title[50];
+        sprintf(title, "Caster Sim (%d kHz)", SIM_STEP / ms_delta);
+        SDL_SetWindowTitle(window, title);
+        ms_tick = SDL_GetTicks();
+
 #ifdef MAX_CYCLES
         if (tickcount > MAX_CYCLES)
             break;
@@ -156,8 +195,9 @@ int main(int argc, char *argv[]) {
 
     printf("Stop.\n");
 
-    if (trace)
-        trace->close();
+#ifdef TRACE
+    trace->close();
+#endif
 
     SDL_FreeSurface(screen);
     SDL_DestroyTexture(texture);

@@ -22,16 +22,49 @@
 //
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include "srcsim.h"
 #include "dispsim.h"
+#include "stb_image.h"
+#include "stb_image_resize.h"
 
+// Only MSB is used
 static uint8_t pixels[DISP_WIDTH * DISP_HEIGHT];
 static int x_counter;
 static int y_counter;
 static int frame_counter;
 
+void print_buffer(uint8_t *buf, size_t bytes) {
+    for (int i = 0; i < bytes / 16; i++) {
+        for (int j = 0; j < 16; j++) {
+            printf("%02x ", buf[i*16+j]);
+        }
+        printf("\n");
+    }
+}
+
+static uint8_t rgb2y(uint32_t r, uint32_t g, uint32_t b, int x, int y) {
+#ifdef DES
+    int c = (x + (DISP_HEIGHT - y)) % 3;
+    if (c == 0)
+        return r;
+    else if (c == 1)
+        return b;
+    else
+        return g;
+#endif
+#ifdef MONO
+    r = r >> 4;
+    g = g >> 3;
+    b = b >> 4;
+    uint32_t y = r + g + b;
+    return y << 2;
+#endif
+}
+
 void srcsim_next_frame() {
+#if 0 // Bouncing box
     static int x = 0, y = 0;
     static int dir = 0;
     memset(pixels, 0xff, DISP_WIDTH * DISP_HEIGHT);
@@ -86,6 +119,65 @@ void srcsim_next_frame() {
         }
     }
     frame_counter++;
+#endif
+#if 1 // Image source
+    static int initial_frame = 1;
+    if (!initial_frame)
+        return;
+    int x, y, n;
+    uint8_t *data = stbi_load("test1.jpg", &x, &y, &n, 0);
+    printf("Input image size %d x %d (%d channels)\n", x, y, n);
+    uint8_t *scaled = (uint8_t *)calloc(1, DISP_WIDTH * DISP_HEIGHT * n);
+    float scalex, scaley;
+    scalex = (float)DISP_WIDTH / (float)x;
+    scaley = (float)DISP_HEIGHT / (float)y;
+    // Fit the image into destination size keeping aspect ratio
+    int outh, outw, outstride, outoffset;
+    if (scalex > scaley) {
+        outh = DISP_HEIGHT;
+        outw = x * scaley;
+        outoffset = ((DISP_WIDTH - outw) / 2) * n;
+        outstride = x * n;
+    }
+    else {
+        outw = DISP_WIDTH;
+        outh = y * scalex;
+        outoffset = ((DISP_HEIGHT - outh) / 2) * n * DISP_WIDTH;
+        outstride = 0;
+    }
+    stbir_resize_uint8(data, x, y, 0, scaled + outoffset, outw, outh, outstride, n);
+    free(data);
+    uint8_t *rdptr = scaled;
+    uint8_t *wrptr = pixels;
+    if (n == 4) {
+        for (int y = 0; y < DISP_HEIGHT; y++) {
+            for (int x = 0; x < DISP_WIDTH; x++) {
+                uint32_t r = *rdptr++;
+                uint32_t g = *rdptr++;
+                uint32_t b = *rdptr++;
+                uint32_t a = *rdptr++;
+                uint32_t yy = rgb2y(r, g, b, x, y);
+                *wrptr++ = yy;
+            }
+        }
+    }
+    else if (n == 3) {
+        for (int y = 0; y < DISP_HEIGHT; y++) {
+            for (int x = 0; x < DISP_WIDTH; x++) {
+                uint32_t r = *rdptr++;
+                uint32_t g = *rdptr++;
+                uint32_t b = *rdptr++;
+                uint32_t yy = rgb2y(r, g, b, x, y);
+                *wrptr++ = yy;
+            }
+        }
+    }
+    else if (n == 1) {
+        memcpy(wrptr, rdptr, DISP_WIDTH * DISP_HEIGHT);
+    }
+    free(scaled);
+    initial_frame = 0;
+#endif
 }
 
 void srcsim_reset() {
@@ -99,7 +191,6 @@ void srcsim_apply(uint8_t &vsync, uint16_t &pixel, uint8_t &valid,
     vsync = (y_counter == 0) ? 1 : 0;
     valid = 1;
     if (ready) {
-        // Image input is Y4 for now, will be Y8 soon
         uint32_t output = 0;
         for (int i = 0; i < 4; i++) {
             uint32_t p = pixels[y_counter * DISP_WIDTH + x_counter++];
@@ -115,7 +206,6 @@ void srcsim_apply(uint8_t &vsync, uint16_t &pixel, uint8_t &valid,
             if (y_counter == DISP_HEIGHT) {
                 y_counter = 0;
                 srcsim_next_frame();
-                printf("VIN FS\n");
             }
         }
     }

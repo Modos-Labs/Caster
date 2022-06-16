@@ -40,6 +40,8 @@ CPPSRCS += \
 	./main.cpp \
 	./dispsim.cpp \
 	./srcsim.cpp \
+	./stb.cpp \
+	./vramsim.cpp \
 	verilated.cpp \
 	verilated_vcd_c.cpp
 
