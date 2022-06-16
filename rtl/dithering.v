@@ -102,8 +102,7 @@ module dithering (
     adder_sat adder_sat3 (vin[3:0], b3, c3);
     assign vo_ordered = {c0, c1, c2, c3};
 
-    wire [15:0] vo = (mode == MODE_NO_DITHER) ? vo_no_dither :
-            (mode == MODE_ORDERED_1B) ? vo_ordered : 16'h0000;
+    wire [15:0] vo = (mode == MODE_NO_DITHER) ? vo_no_dither : vo_ordered;
 
     always @(posedge clk) begin
         vout <= vo;

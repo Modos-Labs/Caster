@@ -33,7 +33,7 @@ module caster(
     // 16 bit per pixel for state
     input  wire [63:0]  bi_pixel,
     input  wire         bi_valid,
-    output wire         bi_ready,
+    output reg          bi_ready,
     // Framebuffer output
     output reg  [63:0]  bo_pixel,
     output wire         bo_valid,
@@ -289,7 +289,8 @@ module caster(
     assign epd_sdle = (scan_in_hsync) ? 1'b1 : 1'b0;
     assign epd_sdclk = (scan_in_hfp || scan_in_hsync || scan_in_hact) ? ~clk : 1'b0;
 
-    assign bi_ready = proc_in_act;
+    always @(posedge clk)
+        bi_ready <= vin_ready; // bi_ready lags vin_ready for 1 cycle for dithering
     assign bo_valid = scan_in_act;
 
     assign b_trigger = (scan_state == SCAN_WAITING);
