@@ -6,7 +6,7 @@
 // 
 // Create Date:    21:53:53 06/13/2022 
 // Design Name:    caster
-// Module Name:    dithering 
+// Module Name:    ordered_dithering 
 // Project Name: 
 // Target Devices: generic
 // Tool versions: 
@@ -19,26 +19,17 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module dithering (
+module ordered_dithering (
     input wire        clk,
     input wire        rst,
     input wire [15:0] vin,
     output reg [15:0] vout,
     input wire [2:0]  x_pos,
-    input wire [2:0]  y_pos,
-    input wire        mode
+    input wire [2:0]  y_pos
 );
     parameter COLORMODE = "DES";
 
-    localparam MODE_NO_DITHER = 1'd0;
-    localparam MODE_ORDERED = 1'd1;
-
-    wire [15:0] vo_no_dither;
     wire [15:0] vo_ordered;
-
-    assign vo_no_dither = vin;
-
-    // ORDERED DITHERING
     wire [3:0] b0, b1, b2, b3;
 
     generate
@@ -102,10 +93,8 @@ module dithering (
     adder_sat adder_sat3 (vin[3:0], b3, c3);
     assign vo_ordered = {c0, c1, c2, c3};
 
-    wire [15:0] vo = (mode == MODE_NO_DITHER) ? vo_no_dither : vo_ordered;
-
     always @(posedge clk) begin
-        vout <= vo;
+        vout <= vo_ordered;
     end
 
 endmodule

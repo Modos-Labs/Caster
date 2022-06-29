@@ -25,7 +25,7 @@ VERILATOR := $(VERILATOR_ROOT)/bin/verilator
 endif
 VFLAGS := -Wall -Wno-fatal -MMD --trace -cc 
 
-SRC := caster.v dithering.v pixel_processing.v
+SRC := caster.v
 
 $(VOBJ)/Vcaster__ALL.a: $(VOBJ)/Vcaster.cpp $(VOBJ)/Vcaster.h
 $(VOBJ)/Vcaster__ALL.a: $(VOBJ)/Vcaster.mk

@@ -20,12 +20,16 @@
 //
 //////////////////////////////////////////////////////////////////////////////////
 module pixel_processing(
-    input  wire [3:0]  proc_vin,
-    input  wire [15:0] proc_bi,
-    output wire [15:0] proc_bo,
-    output wire [1:0]  proc_output,
-    input  wire [1:0]  op_state,
-    input  wire [10:0] op_framecount
+    input  wire [3:0]  proc_p_or,   // Original pixel
+    input  wire [3:0]  proc_p_od,   // Ordered dithered pixel to 1-bit
+    input  wire [3:0]  proc_p_e1,   // Error diffusion dithered pixel to 1-bit
+    input  wire [3:0]  proc_p_e4,   // Error diffusion dithered pixel to 4-bit
+    input  wire [15:0] proc_bi,     // Pixel state input from VRAM
+    output wire [15:0] proc_bo,     // Pixel state output to VRAM
+    input  wire [1:0]  proc_lut_rd, // Read out from LUT
+    output wire [1:0]  proc_output, // Output to screen
+    input  wire [1:0]  op_state,    // Current overall operating state
+    input  wire [10:0] op_framecount// Current overall frame counter for state
 );
     localparam OP_INIT = 2'd0; // Initial power up
     localparam OP_NORMAL = 2'd1; // Normal operation
@@ -37,6 +41,12 @@ module pixel_processing(
     localparam MODE_FAST_MONO = 2'b01;
     localparam MODE_FAST_GREY = 2'b10;
     localparam MODE_RESERVED = 2'b11;
+
+    // Bit 13-12: Dithering mode
+    localparam DITHER_NONE = 2'b00;
+    localparam DITHER_ORDERED = 2'b01;
+    localparam DITHER_ED_1BIT = 2'b10;
+    localparam DITHER_ED_4BIT = 2'b11;
 
     //localparam FASTM_B2W_FRAMES = 6'd9;
     //localparam FASTM_W2B_FRAMES = 6'd9;
@@ -53,24 +63,18 @@ module pixel_processing(
     localparam FASTG_DG2W_FRAMES = 6'd8;
 
     // In normal LUT mode:
-    // Bit 13: LUT ID
-    //   Only up to 2 are allowed due to limited LUT RAM size
-    //   The naming is just a suggestion. Host might reload waveform at runtime
-    localparam LUTID_DU = 1'b0;
-    localparam LUTID_GC16 = 1'b1;
-
     // Bit 12-10: Reserved
     // Bit 9-4: Frame counter (up to 64 frames)
     // Bit 3-0: Previous frame pixel value
 
     // In fast mono mode:
-    // Bit 13-10: Reserved
+    // Bit 12-10: Reserved
     // Bit 9-4: Frame counter
     // Bit 3-1: Must be 0
     // Bit 0: Previous frame pixel value (0 black 1 white)
 
     // In fast grey 4-level mode:
-    // Bit 13-12: Reserved
+    // Bit 12: Reserved
     // Bit 11-10: Stage
     // Bit 9-4: Frame counter
     // Bit 3-2: Must be 0
@@ -83,7 +87,7 @@ module pixel_processing(
 
     // Pixel processing
     wire [1:0] pixel_mode = proc_bi[15:14];
-    wire pixel_lutid = proc_bi[13];
+    wire [1:0] pixel_dither = proc_bi[13:12];
     wire [1:0] pixel_stage = proc_bi[11:10];
     wire [5:0] pixel_framecnt = proc_bi[9:4];
     wire [3:0] pixel_prev = proc_bi[3:0];
@@ -93,6 +97,11 @@ module pixel_processing(
     wire [5:0] pixel_framecnt_2b = FASTM_W2B_FRAMES - pixel_framecnt + 2;
     wire [5:0] pixel_framecnt_back = FASTG_B2G_FRAMES - pixel_framecnt + 1;
     wire [5:0] pixel_framecnt_oppo = FASTM_B2W_FRAMES - FASTG_B2G_FRAMES + pixel_framecnt;
+
+    wire [3:0] proc_vin =
+        (pixel_dither == DITHER_NONE) ? (proc_p_or) :
+        (pixel_dither == DITHER_ORDERED) ? (proc_p_od) :
+        (pixel_dither == DITHER_ED_1BIT) ? (proc_p_e1) : (proc_p_e4);
 
     assign proc_output =
         (op_state == OP_INIT) ? (
@@ -118,7 +127,7 @@ module pixel_processing(
             // Normal state
             (pixel_mode == MODE_NORMAL_LUT) ? (
                 // Normal LUT mode
-                2'b00 // Not supported yet
+                proc_lut_rd
             ) : (pixel_mode == MODE_FAST_MONO) ? (
                 // Fast mono mode
                 (pixel_framecnt != 0) ? (
@@ -161,8 +170,8 @@ module pixel_processing(
         ));
     assign proc_bo =
         (op_state == OP_INIT) ? (
-            {MODE_FAST_MONO, 4'b0, 6'd0, 3'b0, 1'b1}
-            //{MODE_FAST_GREY, 4'b0, 6'd0, 2'b0, 2'b11}
+            {MODE_FAST_MONO, DITHER_NONE, 2'b0, 6'd0, 3'b0, 1'b1}
+            //{MODE_FAST_GREY, DITHER_NONE, 2'b0, 6'd0, 2'b0, 2'b11}
         ) : (op_state == OP_NORMAL) ? (
             // Normal state
             (pixel_mode == MODE_NORMAL_LUT) ? (
