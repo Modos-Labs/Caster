@@ -450,7 +450,7 @@ module memif(
         // The WR state machine works as following:
         // Try to fill BURST_LENGTH number of words into WR FIFO
         // Then issue a burst write
-        if (sys_rst) begin
+        if (sys_rst && !ddr_calib_done) begin
             wr_state <= WR_IDLE;
         end
         else begin
@@ -511,7 +511,7 @@ module memif(
     always @(posedge clk_mif) begin
         // RD state machine is a bit different:
         // It always tries to issue RD as long as output is not full
-        if (sys_rst) begin
+        if (sys_rst && !ddr_calib_done) begin
             rd_state <= RD_IDLE;
         end
         else begin
@@ -560,7 +560,7 @@ module memif(
     localparam ISSUE_ACT = 1'd1;
 
     always @(posedge clk_mif) begin
-        if (sys_rst) begin
+        if (sys_rst && !ddr_calib_done) begin
             mig_p0_cmd_en <= 1'b0;
             issue_state <= ISSUE_WAIT;
             rd_issue_done <= 1'b0;

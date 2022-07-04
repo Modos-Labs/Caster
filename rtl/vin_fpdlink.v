@@ -41,6 +41,7 @@ module vin_fpdlink(
     wire vi_rst;
 
     fpdlink_serdes_in fpdlink_serdes_in (
+        .rstin(rst),
         .rst(vi_rst),
         .cp(fpdlink_cp),
         .cn(fpdlink_cn),

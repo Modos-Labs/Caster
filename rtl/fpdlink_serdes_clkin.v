@@ -20,6 +20,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////////
 module fpdlink_serdes_clkin(
+    input  wire rstin,
     output wire rst,            // Async RST
     input  wire clk_p,          // CKP pin
     input  wire clk_n,          // CKN pin
@@ -107,7 +108,7 @@ module fpdlink_serdes_clkin(
         .DEN(1'b0),
         .DI(16'h0000),
         .DWE(1'b0),
-        .RST(1'b0),
+        .RST(rstin),
         .REL(1'b0)
     );
     

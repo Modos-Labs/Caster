@@ -19,7 +19,7 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module fpdlink_serdes_in(rst, cp, cn, dp, dn, gclk, dout);
+module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
     
     // Possible values:
     // 3: 18bpp single channel
@@ -28,6 +28,7 @@ module fpdlink_serdes_in(rst, cp, cn, dp, dn, gclk, dout);
     // 8: 24bpp dual channel
     parameter integer LANES = 6;
     
+    input  wire                 rstin;
     output wire                 rst;
     input  wire                 cp;
     input  wire                 cn;
@@ -53,6 +54,7 @@ module fpdlink_serdes_in(rst, cp, cn, dp, dn, gclk, dout);
     wire bitslip;
 
     fpdlink_serdes_clkin fpdlink_serdes_clkin (
+        .rstin(rstin),
         .rst(rst),
         .clk_p(cp),
         .clk_n(cn),
@@ -95,7 +97,7 @@ module fpdlink_serdes_in(rst, cp, cn, dp, dn, gclk, dout);
         .D(LANES)
     )
     phase_detector (
-        .use_phase_detector(1'b0),
+        .use_phase_detector(1'b1),
         .busy(busy),
         .valid(valid),    
         .inc_dec(incdec),    

@@ -29,15 +29,15 @@ module tb_caster;
 	reg rst;
 	reg pok;
 	reg vin_vsync;
-	reg vin_hsync;
-	reg vin_de;
-	reg [31:0] vin_pixel;
-	reg [31:0] bi_pixel;
+	reg vin_valid;
+	reg [15:0] vin_pixel;
+	reg [63:0] bi_pixel;
 	reg bi_valid;
 
 	// Outputs
+    wire vin_ready;
 	wire bi_ready;
-	wire [31:0] bo_pixel;
+	wire [63:0] bo_pixel;
 	wire bo_valid;
 	wire epd_gdoe;
 	wire epd_gdclk;
@@ -45,18 +45,39 @@ module tb_caster;
 	wire epd_sdclk;
 	wire epd_sdle;
 	wire epd_sdoe;
-	wire [15:0] epd_sd;
+	wire [7:0] epd_sd;
 	wire epd_sdce0;
+    
+    parameter EPDC_H_FP   = 120;
+    parameter EPDC_H_SYNC = 10;
+    parameter EPDC_H_BP   = 10;
+    parameter EPDC_H_ACT  = 400;
+    // Vertical
+    parameter EPDC_V_FP   = 45;
+    parameter EPDC_V_SYNC = 1;
+    parameter EPDC_V_BP   = 2;
+    parameter EPDC_V_ACT  = 1200;
 
 	// Instantiate the Unit Under Test (UUT)
-	caster uut (
+	caster #(
+        .H_FP(EPDC_H_FP),
+        .H_SYNC(EPDC_H_SYNC),
+        .H_BP(EPDC_H_BP),
+        .H_ACT(EPDC_H_ACT),
+        .V_FP(EPDC_V_FP),
+        .V_SYNC(EPDC_V_SYNC),
+        .V_BP(EPDC_V_BP),
+        .V_ACT(EPDC_V_ACT),
+        .SIMULATION("TRUE"),
+        .COLORMODE("MONO")
+    ) uut (
 		.clk(clk), 
 		.rst(rst), 
-		.pok(pok), 
+		.sys_ready(pok), 
 		.vin_vsync(vin_vsync), 
-		.vin_hsync(vin_hsync), 
-		.vin_de(vin_de), 
 		.vin_pixel(vin_pixel), 
+        .vin_valid(vin_valid),
+        .vin_ready(vin_ready),
 		.bi_pixel(bi_pixel), 
 		.bi_valid(bi_valid), 
 		.bi_ready(bi_ready), 
@@ -77,12 +98,11 @@ module tb_caster;
 		clk = 0;
 		rst = 0;
 		pok = 0;
-		vin_vsync = 0;
-		vin_hsync = 0;
-		vin_de = 0;
+		vin_vsync = 1;
+		vin_valid = 1;
 		vin_pixel = 0;
 		bi_pixel = 0;
-		bi_valid = 0;
+		bi_valid = 1;
 
         #10;
 		rst = 1;

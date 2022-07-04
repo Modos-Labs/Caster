@@ -63,6 +63,8 @@ module top(
     input wire [2:0] LVDS_EVEN_N
     );
     
+    parameter COLORMODE = "MONO";
+    
     parameter SIMULATION = "FALSE";
     parameter CALIB_SOFT_IP = "TRUE";
     parameter CLK_SOURCE = "DCM"; // Possible values: DDR, FPD, DCM
@@ -75,9 +77,9 @@ module top(
     parameter VIN_H_SYNC  = 96;  //Sync
     parameter VIN_H_BP    = 152; //Back porch
     parameter VIN_H_ACT   = 800; //Active pixels
-    parameter EPDC_H_FP   = 10;
+    parameter EPDC_H_FP   = 120;
     parameter EPDC_H_SYNC = 10;
-    parameter EPDC_H_BP   = 120;
+    parameter EPDC_H_BP   = 10;
     parameter EPDC_H_ACT  = 400;
     // Vertical
     parameter VIN_V_FP    = 1;    //Front porch
@@ -97,7 +99,7 @@ module top(
     wire mif_rst;
     
     generate
-    if (CLK_SOURCE == "DCM") begin: clocking_dcm
+    if (CLK_SOURCE == "DCM") begin: clocking_dq
         wire pll_locked;
         clocking clocking (
             .clk_in(CLK_IN),
@@ -106,7 +108,18 @@ module top(
             .reset(1'b0),
             .locked(pll_locked)
         );
-        assign mif_rst = !pll_locked;
+        reg [26:0] rst_counter;
+        always @(posedge clk_sys) begin
+            if (!pll_locked) begin
+                rst_counter <= 27'd0;
+            end
+            else begin
+                if (!rst_counter[26])
+                    rst_counter <= rst_counter + 1;
+            end
+        end
+        assign mif_rst = !rst_counter[26];
+        //assign mif_rst = !pll_locked;
     end
     else if (CLK_SOURCE == "DDR") begin: clocking_ddr
         reg c3_sys_rst = 1'b1;
@@ -137,7 +150,8 @@ module top(
     wire b_trigger;
 
     // Video input
-    wire v_vs, v_hs, v_de, v_pclk;
+    (* KEEP = "TRUE" *) wire v_pclk;
+    wire v_vs, v_hs, v_de;
     wire [7:0] v_pixel;
     
     /*vin_internal #(
@@ -158,7 +172,9 @@ module top(
         .v_de(v_de),
         .v_pixel(v_pixel)
     );*/
-    vin_fpdlink vin_fpdlink(
+    vin_fpdlink #(
+        .COLORMODE(COLORMODE)
+    ) vin_fpdlink(
         .clk(clk_sys),
         .rst(sys_rst),
         .fpdlink_cp(LVDS_ODD_CK_P),
@@ -175,7 +191,7 @@ module top(
     );
     
     // Generate 1/2 video clock
-    wire clk_epdc;
+    (* KEEP = "TRUE" *) wire clk_epdc;
     clk_div #(.WIDTH(1), .DIV(2)) clk_epdc_div (
         .i(v_pclk),
         .o(clk_epdc)
@@ -188,7 +204,7 @@ module top(
     wire vin_ready;
     
     vi_fifo vi_fifo (
-        .rst(b_trigger), // input rst, reset at each frame
+        .rst(vin_vsync), // input rst, reset at each frame
         // Write port
         .wr_clk(v_pclk), // input wr_clk
         .din(v_pixel), // input [7 : 0] din
@@ -285,7 +301,7 @@ module top(
     wire bi_valid;
     wire bi_ready;
     bi_fifo bi_fifo(
-        .rst(b_trigger), // input rst, reset at each frame
+        .rst(sys_rst), // input rst, reset at each frame
         // Write port
         .wr_clk(clk_mif),
         .din(pix_read),
@@ -306,7 +322,7 @@ module top(
     wire [63:0] bo_pixel;
     wire bo_valid;
     bo_fifo bo_fifo(
-        .rst(b_trigger), // input rst, reset at each frame
+        .rst(sys_rst), // input rst, reset at each frame
         // Write port
         .wr_clk(clk_epdc),
         .din(bo_pixel),
@@ -382,7 +398,8 @@ module top(
         .V_SYNC(EPDC_V_SYNC),
         .V_BP(EPDC_V_BP),
         .V_ACT(EPDC_V_ACT),
-        .SIMULATION(SIMULATION)
+        .SIMULATION(SIMULATION),
+        .COLORMODE(COLORMODE)
     )
     caster(
         .clk(clk_epdc),

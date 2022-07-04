@@ -80,7 +80,7 @@ module caster(
 
     // Internal design specific
     localparam VS_DELAY = 8; // wait 8 clocks after VS is vaild
-    localparam PIPELINE_DELAY = 5;
+    localparam PIPELINE_DELAY = 4;
 
     reg [10:0] scan_v_cnt;
     reg [10:0] scan_h_cnt;

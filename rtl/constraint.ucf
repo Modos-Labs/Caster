@@ -9,6 +9,11 @@ NET "CLK_IN"        LOC = "E8";
 NET "CLK_IN"        TNM_NET = "CLK33";
 TIMESPEC "TS_CLK33" = PERIOD "CLK33" 30 ns HIGH 50 %;
 
+NET "v_pclk" TNM_NET = "pclk";
+TIMESPEC "ts_pclk" = PERIOD "pclk" 12.5ns HIGH 50 %;
+
+NET "clk_epdc_BUFG" TNM_NET = "clkepdc";
+TIMESPEC "ts_clkepdc" = PERIOD "clkepdc" 25ns HIGH 50 %;
 
 ##################################################################################
 # Timing Ignore constraints for paths crossing the clock domain 
