@@ -4,6 +4,7 @@ isim/
 _xmsgs/
 _ngo/
 iseconfig/
+ipcore_dir/
 tmp/
 xst/
 top_*
