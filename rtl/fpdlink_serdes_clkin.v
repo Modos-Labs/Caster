@@ -369,3 +369,4 @@ module fpdlink_serdes_clkin(
     end
     
 endmodule
+`default_nettype wire

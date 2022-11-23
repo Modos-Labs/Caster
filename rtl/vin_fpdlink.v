@@ -139,3 +139,4 @@ module vin_fpdlink(
     assign v_pixel = {y_even, y_odd};
     
 endmodule
+`default_nettype wire

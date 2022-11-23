@@ -98,3 +98,4 @@ module ordered_dithering (
     end
 
 endmodule
+`default_nettype wire

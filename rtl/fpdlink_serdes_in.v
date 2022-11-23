@@ -113,3 +113,4 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
     );
 
 endmodule
+`default_nettype wire

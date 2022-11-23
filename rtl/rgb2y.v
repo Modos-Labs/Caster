@@ -30,3 +30,4 @@ module rgb2y(
     assign y = y_add[5:2];
 
 endmodule
+`default_nettype wire

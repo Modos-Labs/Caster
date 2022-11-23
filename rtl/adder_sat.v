@@ -31,3 +31,4 @@ module adder_sat(
     assign c = add[4] ? (b[3] ? (4'h0) : (4'hF)) : (add[3:0]);
 
 endmodule
+`default_nettype wire

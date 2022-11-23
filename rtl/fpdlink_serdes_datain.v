@@ -175,3 +175,4 @@ module fpdlink_serdes_datain(
     );
     
 endmodule
+`default_nettype wire

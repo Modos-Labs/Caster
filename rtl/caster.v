@@ -396,3 +396,4 @@ module caster(
     assign b_trigger = (scan_state == SCAN_WAITING);
 
 endmodule
+`default_nettype wire

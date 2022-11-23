@@ -426,7 +426,7 @@ module top(
     );
     
     // Debug
-    wire [35:0] chipscope_control0;
+    /*wire [35:0] chipscope_control0;
     
     chipscope_icon icon (
         .CONTROL0(chipscope_control0) // INOUT BUS [35:0]
@@ -441,7 +441,7 @@ module top(
             ddr_calib_done,
             5'b0
         })
-    );
+    );*/
     
     assign EPD_SD[15:8] = {
         v_vs,
@@ -452,3 +452,4 @@ module top(
     };
 
 endmodule
+`default_nettype wire

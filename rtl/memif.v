@@ -603,3 +603,4 @@ module memif(
     assign cmp_data_valid = 1'b0;
 
 endmodule
+`default_nettype wire

@@ -286,3 +286,4 @@ module pixel_processing(
         );
 
 endmodule
+`default_nettype wire
