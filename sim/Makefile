@@ -7,7 +7,7 @@ VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | 
 endif
 VROOT := $(VERILATOR_ROOT)
 VINCD := $(VROOT)/include
-RTLOBJDIR := $(RTLDIR)/obj_dir
+RTLOBJDIR := obj_dir
 RTLOBJ := $(RTLOBJDIR)/Vcaster__ALL.a
 
 CC = g++
@@ -43,19 +43,24 @@ CPPSRCS += \
 	./stb.cpp \
 	./vramsim.cpp \
 	verilated.cpp \
-	verilated_vcd_c.cpp
+	verilated_vcd_c.cpp \
+	verilated_threads.cpp
 
 OBJS :=	$(CSRCS:%.c=$(OBJODIR)/%.o) \
 		$(CPPSRCS:%.cpp=$(OBJODIR)/%.o)
 
 OBJS += $(RTLOBJ)
 
-$(OBJODIR)/%.o: %.c
+$(RTLOBJ):
+	@echo Building RTL
+	make -f rtl.mk
+
+$(OBJODIR)/%.o: %.c $(RTLOBJ)
 	@echo [CC] $<
 	@mkdir -p $(dir $@)
 	@$(CC) $(COMMONFLAGS) $(CCFLAGS) $(INCLUDES) -c -o $@ $<
 
-$(OBJODIR)/%.o: %.cpp
+$(OBJODIR)/%.o: %.cpp $(RTLOBJ)
 	@echo [CXX] $<
 	@mkdir -p $(dir $@)
 	@$(CXX) $(COMMONFLAGS) $(CPPFLAGS) $(INCLUDES) -c -o $@ $<
@@ -72,6 +77,7 @@ all: $(OBJS)
 
 PHONY += clean
 clean:
+	make -f rtl.mk clean
 	rm -rf $(OBJODIR)
 	rm -f $(TARGET)
 	@echo 'clean finish'
