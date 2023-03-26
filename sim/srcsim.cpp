@@ -58,13 +58,13 @@ static uint8_t rgb2y(uint32_t r, uint32_t g, uint32_t b, int x, int y) {
     r = r >> 4;
     g = g >> 3;
     b = b >> 4;
-    uint32_t y = r + g + b;
-    return y << 2;
+    uint32_t yy = r + g + b;
+    return yy << 2;
 #endif
 }
 
 void srcsim_next_frame() {
-#if 0 // Bouncing box
+#if 1 // Bouncing box
     static int x = 0, y = 0;
     static int dir = 0;
     memset(pixels, 0xff, DISP_WIDTH * DISP_HEIGHT);
@@ -119,8 +119,17 @@ void srcsim_next_frame() {
         }
     }
     frame_counter++;
-#endif
-#if 1 // Image source
+#elif 1 // fixed border
+    memset(pixels, 0xff, DISP_WIDTH * DISP_HEIGHT);
+    for (int i = 0; i < DISP_WIDTH; i++) {
+        pixels[i] = 0x00;
+        pixels[(DISP_HEIGHT - 1) * DISP_WIDTH + i] = 0x00;
+    }
+    for (int i = 0; i < DISP_HEIGHT; i++) {
+        pixels[DISP_WIDTH * i] = 0x00;
+        pixels[DISP_WIDTH * i + DISP_WIDTH - 1] = 0x00;
+    }
+#elif 0 // Image source
     static int initial_frame = 1;
     if (!initial_frame)
         return;

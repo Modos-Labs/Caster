@@ -36,7 +36,7 @@
 
 #define SIM_STEP 100000
 //#define MAX_CYCLES 500000
-//#define TRACE
+#define TRACE
 
 constexpr int DISP_FACTOR = 2;
 
@@ -53,6 +53,14 @@ VerilatedVcdC *trace;
 uint64_t tickcount;
 
 void tick() {
+    // Create local copy of input signals
+    uint8_t vin_vsync;
+    uint16_t vin_pixel;
+    uint8_t vin_valid;
+    uint64_t bi_pixel;
+    uint8_t bi_valid;
+
+    // Call simulated modules
     dispsim_apply(
         (uint32_t *)screen->pixels,
         core->epd_gdoe,
@@ -64,24 +72,38 @@ void tick() {
         core->epd_sdce0
     );
     srcsim_apply(
-        core->vin_vsync,
-        core->vin_pixel,
-        core->vin_valid,
+        vin_vsync,
+        vin_pixel,
+        vin_valid,
         core->vin_ready
     );
     vramsim_apply(
         core->b_trigger,
-        core->bi_pixel,
-        core->bi_valid,
+        bi_pixel,
+        bi_valid,
         core->bi_ready,
         core->bo_pixel,
         core->bo_valid
     );
+
+    // Posedge
     core->clk = 1;
+    core->eval();
+
+    // Apply changed input signals after clock edge
+    core->vin_vsync = vin_vsync;
+    core->vin_pixel = vin_pixel;
+    core->vin_valid = vin_valid;
+    core->bi_pixel = bi_pixel;
+    core->bi_valid = bi_valid;
+
+    // Let combinational changes propagate
     core->eval();
 #ifdef TRACE
     trace->dump(tickcount * 10);
 #endif
+
+    // Negedge
     core->clk = 0;
     core->eval();
 #ifdef TRACE

@@ -28,9 +28,9 @@
 
 // 160*120*2 = 38.4KB = 4.8Kw
 #define VRAM_SIZE 8192
-uint64_t vram[VRAM_SIZE];
-size_t rdptr, wrptr;
-uint8_t last_trigger;
+static uint64_t vram[VRAM_SIZE];
+static size_t rdptr, wrptr;
+static uint8_t last_trigger;
 
 //#define TRIGGER 2070
 
