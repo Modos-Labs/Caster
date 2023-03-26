@@ -22,7 +22,7 @@
 module ordered_dithering (
     input wire        clk,
     input wire        rst,
-    input wire [15:0] vin,
+    input wire [31:0] vin,
     output reg [15:0] vout,
     input wire [2:0]  x_pos,
     input wire [2:0]  y_pos
@@ -87,10 +87,17 @@ module ordered_dithering (
     end
     endgenerate
     wire [3:0] c0, c1, c2, c3;
-    adder_sat adder_sat0 (vin[15:12], b0, c0);
-    adder_sat adder_sat1 (vin[11:8], b1, c1);
-    adder_sat adder_sat2 (vin[7:4], b2, c2);
-    adder_sat adder_sat3 (vin[3:0], b3, c3);
+
+    localparam BIAS = 9'd10;
+    wire [8:0] a0 = {1'b0, vin[31:24]} + BIAS;
+    wire [8:0] a1 = {1'b0, vin[23:16]} + BIAS;
+    wire [8:0] a2 = {1'b0, vin[15:8]} + BIAS;
+    wire [8:0] a3 = {1'b0, vin[7:0]} + BIAS;
+
+    adder_sat adder_sat0 (a0[8:4], b0, c0);
+    adder_sat adder_sat1 (a1[8:4], b1, c1);
+    adder_sat adder_sat2 (a2[8:4], b2, c2);
+    adder_sat adder_sat3 (a3[8:4], b3, c3);
     assign vo_ordered = {c0, c1, c2, c3};
 
     always @(posedge clk) begin

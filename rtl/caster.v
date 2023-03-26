@@ -23,10 +23,10 @@ module caster(
     input  wire         clk, // 4X/8X output clock rate
     input  wire         rst,
     input  wire         sys_ready, // Power OK, DDR calibration done, etc.
-    // New image Input, 4 pix per clock, Y4 input
+    // New image Input, 4 pix per clock, Y8 input
     // This input is buffered after a ASYNC FIFO
     input  wire         vin_vsync,
-    input  wire [15:0]  vin_pixel,
+    input  wire [31:0]  vin_pixel,
     input  wire         vin_valid,
     output wire         vin_ready,
     // Framebuffer input
@@ -245,11 +245,15 @@ module caster(
         .y_pos(y_pos)
     );
 
+    // Slice Y8 input downto Y4
+    wire [15:0] s1_vin_pixel_y4 = {vin_pixel[31:28], vin_pixel[23:20],
+            vin_pixel[15:12], vin_pixel[7:4]};
+
     // vin and bi pixel are duplicated for use in next stage
     reg [63:0] s2_bi_pixel;
     reg [15:0] s2_vin_pixel;
     always @(posedge clk) begin
-        s2_vin_pixel <= vin_pixel;
+        s2_vin_pixel <= s1_vin_pixel_y4;
         s2_bi_pixel <= bi_pixel;
     end
 

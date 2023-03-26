@@ -149,7 +149,7 @@ module top(
     // Video input
     (* KEEP = "TRUE" *) wire v_pclk;
     wire v_vs, v_hs, v_de;
-    wire [7:0] v_pixel;
+    wire [15:0] v_pixel;
     
     /*vin_internal #(
         .H_FP(VIN_H_FP),
@@ -197,7 +197,7 @@ module top(
     // Video input buffering
     wire fifo_full;
     wire fifo_empty;
-    wire [15:0] vin_pixel;
+    wire [31:0] vin_pixel;
     wire vin_ready;
     
     vi_fifo vi_fifo (

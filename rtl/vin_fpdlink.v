@@ -32,12 +32,13 @@ module vin_fpdlink(
     output wire         v_hsync,
     output wire         v_pclk,
     output wire         v_de,
-    output wire [7:0]   v_pixel // 2 pixels per clock, Y4
+    output wire [15:0]   v_pixel // 2 pixels per clock, Y8
 );
     parameter COLORMODE = "DES";
 
     wire gclk;
-    wire [41:0] fpdlink_din;
+    wire [41:0] fpdlink_din_unreg;
+    reg [41:0] fpdlink_din;
     wire vi_rst;
 
     fpdlink_serdes_in fpdlink_serdes_in (
@@ -48,8 +49,12 @@ module vin_fpdlink(
         .dp({fpdlink_odd_p, fpdlink_even_p}),
         .dn({fpdlink_odd_n, fpdlink_even_n}),
         .gclk(gclk),
-        .dout(fpdlink_din)
+        .dout(fpdlink_din_unreg)
     );
+
+    always @(posedge v_pclk) begin
+        fpdlink_din <= fpdlink_din_unreg;
+    end
     
     wire [5:0] r_odd = fpdlink_din[40:35];
     wire [5:0] g_odd = {fpdlink_din[32:28], fpdlink_din[41]};
@@ -58,9 +63,8 @@ module vin_fpdlink(
     wire [5:0] g_even = {fpdlink_din[11:7], fpdlink_din[20]};
     wire [5:0] b_even = {fpdlink_din[3:0], fpdlink_din[13:12]};
     
-    // TODO: Better color to greyscale
-    wire [3:0] y_odd;
-    wire [3:0] y_even;
+    wire [5:0] y_odd;
+    wire [5:0] y_even;
     
     generate
     if (COLORMODE=="MONO") begin: color_mono
@@ -100,12 +104,15 @@ module vin_fpdlink(
                 end
             end
         end
-        assign y_odd = (c_cnt_x == 2'd0) ? (b_odd[5:2]) :
-                (c_cnt_x == 2'd1) ? (r_odd[5:2]) : (g_odd[5:2]);
-        assign y_even = (c_cnt_x == 2'd0) ? (r_even[5:2]) :
-                (c_cnt_x == 2'd1) ? (g_even[5:2]) : (b_even[5:2]);
+        assign y_odd = (c_cnt_x == 2'd0) ? (b_odd) :
+                (c_cnt_x == 2'd1) ? (r_odd) : (g_odd);
+        assign y_even = (c_cnt_x == 2'd0) ? (r_even) :
+                (c_cnt_x == 2'd1) ? (g_even) : (b_even);
     end
     endgenerate
+
+    wire [7:0] y_odd_bext = {y_odd, y_odd[5:4]};
+    wire [7:0] y_even_bext = {y_even, y_even[5:4]};
     
     wire vsync = fpdlink_din[26];
     reg last_vsync;
@@ -136,7 +143,7 @@ module vin_fpdlink(
     assign v_vsync = vsync & vsync_masking;
     assign v_hsync = fpdlink_din[25];
     assign v_de = fpdlink_din[27];
-    assign v_pixel = {y_even, y_odd};
+    assign v_pixel = {y_even_bext, y_odd_bext};
     
 endmodule
 `default_nettype wire

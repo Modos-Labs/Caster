@@ -55,7 +55,7 @@ uint64_t tickcount;
 void tick() {
     // Create local copy of input signals
     uint8_t vin_vsync;
-    uint16_t vin_pixel;
+    uint32_t vin_pixel;
     uint8_t vin_valid;
     uint64_t bi_pixel;
     uint8_t bi_valid;

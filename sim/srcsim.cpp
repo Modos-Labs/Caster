@@ -29,7 +29,6 @@
 #include "stb_image.h"
 #include "stb_image_resize.h"
 
-// Only MSB is used
 static uint8_t pixels[DISP_WIDTH * DISP_HEIGHT];
 static int x_counter;
 static int y_counter;
@@ -55,16 +54,16 @@ static uint8_t rgb2y(uint32_t r, uint32_t g, uint32_t b, int x, int y) {
         return g;
 #endif
 #ifdef MONO
-    r = r >> 4;
-    g = g >> 3;
-    b = b >> 4;
+    r = r * 77;
+    g = g * 150;
+    b = b * 29;
     uint32_t yy = r + g + b;
-    return yy << 2;
+    return (yy >> 8);
 #endif
 }
 
 void srcsim_next_frame() {
-#if 1 // Bouncing box
+#if 0 // Bouncing box
     static int x = 0, y = 0;
     static int dir = 0;
     memset(pixels, 0xff, DISP_WIDTH * DISP_HEIGHT);
@@ -119,7 +118,7 @@ void srcsim_next_frame() {
         }
     }
     frame_counter++;
-#elif 1 // fixed border
+#elif 0 // fixed border
     memset(pixels, 0xff, DISP_WIDTH * DISP_HEIGHT);
     for (int i = 0; i < DISP_WIDTH; i++) {
         pixels[i] = 0x00;
@@ -129,7 +128,7 @@ void srcsim_next_frame() {
         pixels[DISP_WIDTH * i] = 0x00;
         pixels[DISP_WIDTH * i + DISP_WIDTH - 1] = 0x00;
     }
-#elif 0 // Image source
+#elif 1 // Image source
     static int initial_frame = 1;
     if (!initial_frame)
         return;
@@ -195,7 +194,7 @@ void srcsim_reset() {
     srcsim_next_frame();
 }
 
-void srcsim_apply(uint8_t &vsync, uint16_t &pixel, uint8_t &valid,
+void srcsim_apply(uint8_t &vsync, uint32_t &pixel, uint8_t &valid,
         const uint8_t ready) {
     vsync = (y_counter == 0) ? 1 : 0;
     valid = 1;
@@ -203,8 +202,7 @@ void srcsim_apply(uint8_t &vsync, uint16_t &pixel, uint8_t &valid,
         uint32_t output = 0;
         for (int i = 0; i < 4; i++) {
             uint32_t p = pixels[y_counter * DISP_WIDTH + x_counter++];
-            p = p >> 4;
-            p = p << (3 - i) * 4;
+            p = p << (3 - i) * 8;
             output |= p;
         }
         pixel = output;
