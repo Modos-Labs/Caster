@@ -42,9 +42,6 @@ module top(
     output wire DDR_CK_N,
     inout wire DDR_RZQ,
     inout wire DDR_ZIO,
-    // Master I2C bus
-    inout wire I2C_SDA,
-    output wire I2C_SCL,
     // EPD interface
     output wire EPD_GDOE,
     output wire EPD_GDCLK,
@@ -98,8 +95,8 @@ module top(
     wire clk_ddr;
     wire mif_rst;
     
-    generate
-    if (CLK_SOURCE == "DCM") begin: clocking_dq
+    /*generate
+    if (CLK_SOURCE == "DCM") begin: clocking_dq*/
         wire pll_locked;
         clocking clocking (
             .clk_in(CLK_IN),
@@ -120,7 +117,7 @@ module top(
         end
         assign mif_rst = !rst_counter[26];
         //assign mif_rst = !pll_locked;
-    end
+    /*end
     else if (CLK_SOURCE == "DDR") begin: clocking_ddr
         reg c3_sys_rst = 1'b1;
         always @(posedge clk_sys) begin
@@ -144,7 +141,7 @@ module top(
         assign clk_ddr = v_pclk;
         assign mif_rst = c3_sys_rst;
     end
-    endgenerate
+    endgenerate*/
 
     // Global frame trigger
     wire b_trigger;
@@ -339,9 +336,6 @@ module top(
     // Power controller
     wire pok;
     wire error;
-    wire [2:0] dbg_state;
-    wire pwr_scl;
-    wire pwr_sda;
     
     wire sys_rst_sync;
     dff_sync pok_sync (
@@ -350,35 +344,9 @@ module top(
         .o(sys_rst_sync)
     );
 
-    generate
-    if (SIMULATION == "FALSE") begin: power_controller
-        wire pok_clk_sys;
-        power power(
-            .clk(clk_sys),
-            .rst(sys_rst_sync),
-            .en(1'b1),
-            .cen(1'b1),
-            .pok(pok_clk_sys),
-            .error(error),
-            .i2c_sda(pwr_sda),
-            .i2c_scl(pwr_scl),
-            .dbg_state(dbg_state)
-        );
-        dff_sync pok_sync (
-            .i(pok_clk_sys),
-            .clko(clk_epdc),
-            .o(pok)
-        );
-    end
-    else begin: bypass_power
-        // DEBUGGING: BYPASS POWER INIT
-        assign pok = !sys_rst_sync;
-        assign error = 1'b0;
-    end
-    endgenerate
-    
-    assign I2C_SDA = pwr_sda;
-    assign I2C_SCL = pwr_scl;
+    // TODO: Receive power info from SPI slave
+    assign pok = !sys_rst_sync;
+    assign error = 1'b0;
     
     // EPD controller
     wire epdc_ddr_calib_done;
@@ -426,7 +394,7 @@ module top(
     );
     
     // Debug
-    /*wire [35:0] chipscope_control0;
+    wire [35:0] chipscope_control0;
     
     chipscope_icon icon (
         .CONTROL0(chipscope_control0) // INOUT BUS [35:0]
@@ -439,16 +407,21 @@ module top(
             memif_error,
             memif_data_valid,
             ddr_calib_done,
-            5'b0
+            pll_locked,
+            sys_rst,
+            3'b0
         })
-    );*/
+    );
     
     assign EPD_SD[15:8] = {
         v_vs,
         v_hs,
-        v_pclk,
         v_de,
-        v_pixel
+        v_pixel[7],
+        memif_data_valid,
+        ddr_calib_done,
+        pll_locked,
+        sys_rst
     };
 
 endmodule
