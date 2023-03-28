@@ -82,6 +82,10 @@ module caster(
     localparam VS_DELAY = 8; // wait 8 clocks after VS is vaild
     localparam PIPELINE_DELAY = 4;
 
+    // Control status registers
+    // TODO: Make them into actual CSRs accessed over SPI
+    wire [5:0] csr_lutframe = 6'd38;
+
     reg [10:0] scan_v_cnt;
     reg [10:0] scan_h_cnt;
 
@@ -278,8 +282,10 @@ module caster(
             wire [3:0] wvfm_vin = s2_vin_pixel[i*4+3 : i*4];
             wire [15:0] wvfm_bi = s2_bi_pixel[i*16+15 : i*16];
             wire [5:0] wvfm_fcnt = wvfm_bi[9:4];
-            wire [3:0] wvfm_prev = wvfm_bi[3:0];
-            assign ram_addr_rd[i] = {wvfm_fcnt, wvfm_prev, wvfm_vin};
+            wire [5:0] wvfm_fseq = csr_lutframe - wvfm_fcnt;
+            wire [3:0] wvfm_src = wvfm_bi[13:10];
+            wire [3:0] wvfm_tgt = wvfm_bi[3:0];
+            assign ram_addr_rd[i] = {wvfm_fseq, wvfm_tgt, wvfm_src};
         end
     endgenerate
 
@@ -341,6 +347,7 @@ module caster(
             wire [1:0] proc_output;
 
             pixel_processing pixel_processing(
+                .csr_lutframe(csr_lutframe),
                 .proc_p_or(proc_p_or),
                 .proc_p_od(proc_p_od),
                 .proc_p_e1(proc_p_e1),

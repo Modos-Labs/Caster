@@ -47,5 +47,9 @@ module bramdp(
         else
             doutb <= mem[addrb];
     end
+    
+    initial begin
+        $readmemb("default_waveform.mem", mem);
+    end
 
 endmodule
