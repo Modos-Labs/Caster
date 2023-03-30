@@ -1,24 +1,8 @@
+// fpdlink_serdes_clkin.v
+// FPD-Link I clock receiver based on XAPP1064.
+// This file is not covered under CERN-OHL-P.
 `timescale 1ns / 1ps
 `default_nettype none
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Modos
-// Engineer: Wenting Zhang
-// 
-// Create Date:    01:44:18 06/07/2022 
-// Design Name:    caster
-// Module Name:    serdes_clkin 
-// Project Name: 
-// Target Devices: spartan6
-// Tool versions: 
-// Description: 
-//   FPD-Link I clock receiver based on XAPP1064.
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
 module fpdlink_serdes_clkin(
     input  wire rstin,
     output wire rst,            // Async RST

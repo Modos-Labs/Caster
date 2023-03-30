@@ -1,24 +1,17 @@
+// Copyright Modos / Wenting Zhang 2023
+//
+// This source describes Open Hardware and is licensed under the CERN-OHL-P v2
+//
+// You may redistribute and modify this documentation and make products using
+// it under the terms of the CERN-OHL-P v2 (https:/cern.ch/cern-ohl). This
+// documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY,
+// INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
+// PARTICULAR PURPOSE. Please see the CERN-OHL-P v2 for applicable conditions
+//
+// caster.v
+// EPD controller top-level
 `timescale 1ns / 1ps
 `default_nettype none
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Modos
-// Engineer: Wenting
-// 
-// Create Date:    20:44:53 12/04/2021 
-// Design Name:    caster
-// Module Name:    epd_output 
-// Project Name: 
-// Target Devices: spartan 6
-// Tool versions: 
-// Description: 
-//
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
 module caster(
     input  wire         clk, // 4X/8X output clock rate
     input  wire         rst,

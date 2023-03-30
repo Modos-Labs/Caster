@@ -1,24 +1,8 @@
+// fpdlink_serdes_datain.v
+// FPD-Link I 1:7 LVDS data receiver based on XAPP1064.
+// This file is not covered under CERN-OHL-P.
 `timescale 1ns / 1ps
 `default_nettype none
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Modos
-// Engineer: Wenting Zhang
-// 
-// Create Date:    02:37:45 06/07/2022 
-// Design Name:    caster
-// Module Name:    serdes_datain 
-// Project Name: 
-// Target Devices: 
-// Tool versions: 
-// Description: 
-//   FPD-Link I 1:7 LVDS data receiver based on XAPP1064.
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
 module fpdlink_serdes_datain(
     // Clock and reset
     input  wire         gclk,           // fabric clock

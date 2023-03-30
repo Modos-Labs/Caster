@@ -1,24 +1,17 @@
+// Copyright Modos / Wenting Zhang 2023
+//
+// This source describes Open Hardware and is licensed under the CERN-OHL-P v2
+//
+// You may redistribute and modify this documentation and make products using
+// it under the terms of the CERN-OHL-P v2 (https:/cern.ch/cern-ohl). This
+// documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY,
+// INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
+// PARTICULAR PURPOSE. Please see the CERN-OHL-P v2 for applicable conditions
+//
+// pixel_processing.v
+// Combinational single pixel processing
 `timescale 1ns / 1ps
 `default_nettype none
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Modos
-// Engineer: Wenting
-// 
-// Create Date:    21:22:15 06/13/2022 
-// Design Name:    caster
-// Module Name:    pixel_processing 
-// Project Name: 
-// Target Devices: generic
-// Tool versions: 
-// Description: 
-//
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
 module pixel_processing(
     input  wire [5:0]  csr_lutframe,// Frame count for currently loaded LUT
     input  wire [3:0]  proc_p_or,   // Original pixel

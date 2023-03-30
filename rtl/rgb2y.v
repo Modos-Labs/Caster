@@ -1,24 +1,17 @@
+// Copyright Modos / Wenting Zhang 2023
+//
+// This source describes Open Hardware and is licensed under the CERN-OHL-P v2
+//
+// You may redistribute and modify this documentation and make products using
+// it under the terms of the CERN-OHL-P v2 (https:/cern.ch/cern-ohl). This
+// documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY,
+// INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
+// PARTICULAR PURPOSE. Please see the CERN-OHL-P v2 for applicable conditions
+//
+// rgb2y.v
+// RGB value to luminance
 `timescale 1ns / 1ps
 `default_nettype none
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date:    08:01:05 06/07/2022 
-// Design Name: 
-// Module Name:    rgb2y 
-// Project Name: 
-// Target Devices: 
-// Tool versions: 
-// Description: 
-//
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
 module rgb2y(
     input wire [5:0] r,
     input wire [5:0] g,
@@ -26,6 +19,8 @@ module rgb2y(
     output wire [5:0] y
     );
 
+    // Pretty much overkill.
+    // Could just use simple shifter to save some DSP blocks.
     wire [13:0] r_mult = {8'd0, r} * 14'd77;
     wire [13:0] g_mult = {8'd0, g} * 14'd150;
     wire [13:0] b_mult = {8'd0, b} * 14'd29;

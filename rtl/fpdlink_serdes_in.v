@@ -1,24 +1,8 @@
+// fpdlink_serdes_in.v
+// FPD-Link I 1:7 LVDS deserializer based on XAPP1064.
+// This file is not covered under CERN-OHL-P.
 `timescale 1ns / 1ps
 `default_nettype none
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Modos
-// Engineer: Wenting Zhang
-// 
-// Create Date:    02:21:00 06/07/2021 
-// Design Name:    caster
-// Module Name:    serdes_in
-// Project Name: 
-// Target Devices: 
-// Tool versions: 
-// Description: 
-//   FPD-Link I 1:7 LVDS deserializer
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
 module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
     
     // Possible values:

@@ -1,24 +1,17 @@
+// Copyright Modos / Wenting Zhang 2023
+//
+// This source describes Open Hardware and is licensed under the CERN-OHL-P v2
+//
+// You may redistribute and modify this documentation and make products using
+// it under the terms of the CERN-OHL-P v2 (https:/cern.ch/cern-ohl). This
+// documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY,
+// INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
+// PARTICULAR PURPOSE. Please see the CERN-OHL-P v2 for applicable conditions
+//
+// vin_internal.v
+// Internal video signal generator
 `default_nettype none
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date:    00:32:21 05/31/2022 
-// Design Name: 
-// Module Name:    vin_internal 
-// Project Name: 
-// Target Devices: generic
-// Tool versions: 
-// Description: 
-//   Generate a video stream for testing purposes
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
 module vin_internal(
     input  wire         clk, // 33 MHz system clock input
     input  wire         rst,

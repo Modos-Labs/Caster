@@ -1,24 +1,17 @@
+// Copyright Modos / Wenting Zhang 2023
+//
+// This source describes Open Hardware and is licensed under the CERN-OHL-P v2
+//
+// You may redistribute and modify this documentation and make products using
+// it under the terms of the CERN-OHL-P v2 (https:/cern.ch/cern-ohl). This
+// documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY,
+// INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
+// PARTICULAR PURPOSE. Please see the CERN-OHL-P v2 for applicable conditions
+//
+// top.v
+// Glider top-level
 `default_nettype none
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Modos
-// Engineer: Wenting
-// 
-// Create Date:    23:50:32 11/08/2021 
-// Design Name:    caster
-// Module Name:    top 
-// Project Name: 
-// Target Devices: spartan6
-// Tool versions: 
-// Description: 
-//
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
 module top(
     // Global clock input
     input wire CLK_IN,
@@ -51,13 +44,18 @@ module top(
     output wire EPD_SDOE,
     output wire [15:0] EPD_SD,
     output wire EPD_SDCE0,
-    // MIPI interface 
+    // LVDS interface 
     input wire LVDS_ODD_CK_P,
     input wire LVDS_ODD_CK_N,
     input wire [2:0] LVDS_ODD_P,
     input wire [2:0] LVDS_ODD_N,
     input wire [2:0] LVDS_EVEN_P,
-    input wire [2:0] LVDS_EVEN_N
+    input wire [2:0] LVDS_EVEN_N,
+    // CSR interface
+    input wire SPI_CS,
+    input wire SPI_SCK,
+    input wire SPI_MOSI,
+    output wire SPI_MISO
     );
     
     parameter COLORMODE = "MONO";
@@ -413,16 +411,7 @@ module top(
         })
     );
     
-    assign EPD_SD[15:8] = {
-        v_vs,
-        v_hs,
-        v_de,
-        v_pixel[7],
-        memif_data_valid,
-        ddr_calib_done,
-        pll_locked,
-        sys_rst
-    };
+    assign EPD_SD[15:8] = EPD_SD[7:0]
 
 endmodule
 `default_nettype wire

@@ -1,19 +1,17 @@
+// Copyright Modos / Wenting Zhang 2023
+//
+// This source describes Open Hardware and is licensed under the CERN-OHL-P v2
+//
+// You may redistribute and modify this documentation and make products using
+// it under the terms of the CERN-OHL-P v2 (https:/cern.ch/cern-ohl). This
+// documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY,
+// INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
+// PARTICULAR PURPOSE. Please see the CERN-OHL-P v2 for applicable conditions
+//
+// clk_div.v
+// Basic clock divider
 `timescale 1ns / 1ps
 `default_nettype wire
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: Wenting Zhang
-// 
-// Create Date:    09:50:37 04/07/2018 
-// Module Name:    clk_div 
-// Project Name:   VerilogBoy
-// Description: 
-//
-// Dependencies: 
-//
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
 module clk_div(
     input i,
     output reg o = 0
