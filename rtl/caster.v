@@ -283,32 +283,28 @@ module caster(
     endgenerate
 
     wire ram_we;
-    wire [1:0] ram_wr;
-    wire [13:0] ram_addr_wr;
+    wire [7:0] ram_wr;
+    wire [11:0] ram_addr_wr;
 
-    bramdp bramdp0 (
-        .clka(clk),
-        .wea(ram_we),
-        .addra(ram_we ? ram_addr_wr : ram_addr_rd[0]),
-        .dina(ram_wr),
+    wvfmlut wvfmlut1 (
+        .clk(clk),
+        .we(ram_we),
+        .addr(ram_addr_wr),
+        .din(ram_wr),
+        .addra(ram_addr_rd[0]),
         .douta(s3_lut_rd[1:0]),
-        .clkb(clk),
-        .web(1'b0),
         .addrb(ram_addr_rd[1]),
-        .dinb(2'b0),
         .doutb(s3_lut_rd[3:2])
     );
 
-    bramdp bramdp1 (
-        .clka(clk),
-        .wea(ram_we),
-        .addra(ram_we ? ram_addr_wr : ram_addr_rd[2]),
-        .dina(ram_wr),
+    wvfmlut wvfmlut2 (
+        .clk(clk),
+        .we(ram_we),
+        .addr(ram_addr_wr),
+        .din(ram_wr),
+        .addra(ram_addr_rd[2]),
         .douta(s3_lut_rd[5:4]),
-        .clkb(clk),
-        .web(1'b0),
         .addrb(ram_addr_rd[3]),
-        .dinb(2'b0),
         .doutb(s3_lut_rd[7:6])
     );
 
@@ -375,8 +371,8 @@ module caster(
 
     // TODO: CSR interface
     assign ram_we = 1'b0;
-    assign ram_wr = 2'd0;
-    assign ram_addr_wr = 14'd0;
+    assign ram_wr = 8'd0;
+    assign ram_addr_wr = 12'd0;
 
     // mode
     assign epd_gdoe = (scan_in_vsync || scan_in_vbp || scan_in_vact) ? 1'b1 : 1'b0;

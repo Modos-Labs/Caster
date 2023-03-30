@@ -15,17 +15,17 @@
 module bramdp(
     input wire clka,
     input wire wea,
-    input wire [13:0] addra,
-    input wire [1:0] dina,
-    output reg [1:0] douta,
+    input wire [11:0] addra,
+    input wire [7:0] dina,
+    output reg [7:0] douta,
     input wire clkb,
     input wire web,
-    input wire [13:0] addrb,
-    input wire [1:0] dinb,
-    output reg [1:0] doutb
+    input wire [11:0] addrb,
+    input wire [7:0] dinb,
+    output reg [7:0] doutb
 );
 
-    reg [1:0] mem [0:16383];
+    reg [7:0] mem [0:4095];
 
     always @(posedge clka) begin
         if (wea)
@@ -42,7 +42,7 @@ module bramdp(
     end
     
     initial begin
-        $readmemb("default_waveform.mem", mem);
+        $readmemh("default_waveform.mem", mem);
     end
 
 endmodule
