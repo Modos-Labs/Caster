@@ -355,6 +355,28 @@ module top(
     );
     wire sys_ready = pok && epdc_ddr_calib_done;
 
+    wire spi_cs;
+    wire spi_sck;
+    wire spi_mosi;
+    wire spi_miso;
+    dff_sync spi_cs_sync (
+        .i(SPI_CS),
+        .clko(clk_epdc),
+        .o(spi_cs)
+    );
+
+    dff_sync spi_sck_sync (
+        .i(SPI_SCK),
+        .clko(clk_epdc),
+        .o(spi_sck)
+    );
+
+    dff_sync spi_mosi_sync (
+        .i(SPI_MOSI),
+        .clko(clk_epdc),
+        .o(spi_mosi)
+    );
+
     caster #(
         .H_FP(EPDC_H_FP),
         .H_SYNC(EPDC_H_SYNC),
@@ -388,7 +410,11 @@ module top(
         .epd_sdle(EPD_SDLE),
         .epd_sdoe(EPD_SDOE),
         .epd_sd(EPD_SD[7:0]),
-        .epd_sdce0(EPD_SDCE0)
+        .epd_sdce0(EPD_SDCE0),
+        .spi_cs(spi_cs),
+        .spi_sck(spi_sck),
+        .spi_mosi(spi_mosi),
+        .spi_miso(SPI_MISO)
     );
     
     // Debug

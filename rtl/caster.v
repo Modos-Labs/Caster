@@ -40,7 +40,12 @@ module caster(
     output wire         epd_sdle,
     output wire         epd_sdoe,
     output wire [7:0]   epd_sd,
-    output wire         epd_sdce0
+    output wire         epd_sdce0,
+    // CSR interface
+    input  wire         spi_cs,
+    input  wire         spi_sck,
+    input  wire         spi_mosi,
+    output wire         spi_miso
     );
 
     parameter COLORMODE = "MONO";
@@ -76,8 +81,36 @@ module caster(
     localparam PIPELINE_DELAY = 4;
 
     // Control status registers
-    // TODO: Make them into actual CSRs accessed over SPI
-    wire [5:0] csr_lutframe = 6'd38;
+    wire [5:0] csr_lutframe;
+    wire [11:0] csr_lutaddr;
+    wire [7:0] csr_lutwr;
+    wire csr_lutwe;
+    wire [11:0] csr_opleft;
+    wire [11:0] csr_opright;
+    wire [11:0] csr_optop;
+    wire [11:0] csr_opbottom;
+    wire [7:0] csr_opparam;
+    wire [7:0] csr_opcmd;
+    wire csr_ope;
+    csr csr (
+        .clk(clk),
+        .rst(rst),
+        .spi_cs(spi_cs),
+        .spi_sck(spi_sck),
+        .spi_mosi(spi_mosi),
+        .spi_miso(spi_miso),
+        .csr_lutframe(csr_lutframe),
+        .csr_lutaddr(csr_lutaddr),
+        .csr_lutwr(csr_lutwr),
+        .csr_lutwe(csr_lutwe),
+        .csr_opleft(csr_opleft),
+        .csr_opright(csr_opright),
+        .csr_optop(csr_optop),
+        .csr_opbottom(csr_opbottom),
+        .csr_opparam(csr_opparam),
+        .csr_opcmd(csr_opcmd),
+        .csr_ope(csr_ope)
+    );
 
     reg [10:0] scan_v_cnt;
     reg [10:0] scan_h_cnt;
@@ -282,9 +315,9 @@ module caster(
         end
     endgenerate
 
-    wire ram_we;
-    wire [7:0] ram_wr;
-    wire [11:0] ram_addr_wr;
+    wire ram_we = csr_lutwe;
+    wire [7:0] ram_wr = csr_lutwr;
+    wire [11:0] ram_addr_wr = csr_lutaddr;
 
     wvfmlut wvfmlut1 (
         .clk(clk),
@@ -368,11 +401,6 @@ module caster(
     assign bo_valid = s5_active;
 
     // End of pipeline
-
-    // TODO: CSR interface
-    assign ram_we = 1'b0;
-    assign ram_wr = 8'd0;
-    assign ram_addr_wr = 12'd0;
 
     // mode
     assign epd_gdoe = (scan_in_vsync || scan_in_vbp || scan_in_vact) ? 1'b1 : 1'b0;
