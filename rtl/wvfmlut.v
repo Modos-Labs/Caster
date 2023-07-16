@@ -10,6 +10,8 @@
 //
 // wvfmlut.v
 // Waveform lookup table SRAM wrapper
+`timescale 1ns / 1ps
+`default_nettype none
 module wvfmlut(
     input wire clk,
     // Write port
@@ -36,7 +38,7 @@ module wvfmlut(
         .clkb(clk),
         .web(1'b0),
         .addrb(addrb[13:2]),
-        .dinb(2'b0),
+        .dinb(8'b0),
         .doutb(bram_doutb)
     );
 
@@ -52,5 +54,5 @@ module wvfmlut(
         (addrb[1:0] == 2'd2) ? bram_doutb[5:4] :
         (addrb[1:0] == 2'd3) ? bram_doutb[7:6] : 2'bx;
 
-
 endmodule
+`default_nettype wire

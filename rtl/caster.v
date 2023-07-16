@@ -12,6 +12,7 @@
 // EPD controller top-level
 `timescale 1ns / 1ps
 `default_nettype none
+`include "defines.vh"
 module caster(
     input  wire         clk, // 4X/8X output clock rate
     input  wire         rst,
@@ -70,10 +71,6 @@ module caster(
     localparam SCAN_WAITING = 2'd1;
     localparam SCAN_RUNNING = 2'd2;
 
-    localparam OP_INIT = 2'd0; // Initial power up
-    localparam OP_NORMAL = 2'd1; // Normal operation
-    localparam OP_CLEAR_NORMAL = 2'd2; // In place screen clear
-
     localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 340 : 2; // 240 frames, (black, white)x4
 
     // Internal design specific
@@ -112,21 +109,80 @@ module caster(
         .csr_ope(csr_ope)
     );
 
+    // frame operation are latched at vsync
+    reg trigger_last;
+    always @(posedge clk) begin
+        trigger_last <= b_trigger;
+    end
+    wire op_trigger = !trigger_last & b_trigger;
+    wire op_done;
+
+    // When SPI write to CMDEN, a copy is first created in the pending register
+    reg op_pending;
+    reg [11:0] op_pending_left;
+    reg [11:0] op_pending_right;
+    reg [11:0] op_pending_top;
+    reg [11:0] op_pending_bottom;
+    reg [7:0] op_pending_param;
+    reg [7:0] op_pending_cmd;
+
+    // During Vsync, it's then copied into register to be used by processing
+    reg op_valid;
+    reg [11:0] op_left;
+    reg [11:0] op_right;
+    reg [11:0] op_top;
+    reg [11:0] op_bottom;
+    reg [7:0] op_param;
+    reg [7:0] op_cmd;
+    always @(posedge clk) begin
+        if (op_trigger && op_done) begin
+            op_valid <= op_pending;
+            op_left <= op_pending_left;
+            op_right <= op_pending_right;
+            op_top <= op_pending_top;
+            op_bottom <= op_pending_bottom;
+            op_param <= op_pending_param;
+            op_cmd <= op_pending_cmd;
+            op_pending <= 1'b0;
+        end
+        if (csr_ope) begin
+            op_pending <= 1'b1;
+            op_pending_left <= csr_opleft;
+            op_pending_right <= csr_opright;
+            op_pending_top <= csr_optop;
+            op_pending_bottom <= csr_opbottom;
+            op_pending_param <= csr_opparam;
+            op_pending_cmd <= csr_opcmd;
+        end
+        if (rst) begin
+            op_valid <= 1'b0;
+            op_pending <= 1'b0;
+        end
+    end
+
     reg [10:0] scan_v_cnt;
     reg [10:0] scan_h_cnt;
 
     reg [1:0] scan_state;
     reg [1:0] op_state;
 
-    reg [10:0] op_framecount; // Framecount for operation transition
+    reg [10:0] op_framecnt; // Framecount for operation transition
+    assign op_done = op_framecnt == 0;
+
+    // Counters for auto LUT mode
+    reg [5:0] al_framecnt;
+    reg al_diff_reg;
+    wire al_diff;
 
     always @(posedge clk)
         if (rst) begin
             scan_state <= SCAN_IDLE;
             scan_h_cnt <= 0;
             scan_v_cnt <= 0;
-            op_state <= OP_INIT;
-            op_framecount <= 0;
+            op_state <= `OP_INIT;
+            op_framecnt <= 0;
+            al_diff_reg <= 0;
+            al_framecnt <= 0;
         end
         else begin
             case (scan_state)
@@ -141,6 +197,28 @@ module caster(
                 if (scan_h_cnt == VS_DELAY) begin
                     scan_state <= SCAN_RUNNING;
                     scan_h_cnt <= 0;
+                    // Set frame count limit here
+                    if (op_framecnt == 0) begin
+                        if (op_state == `OP_INIT) begin
+                            op_framecnt <= OP_INIT_LENGTH;
+                        end
+                        else if (op_valid) begin
+                            case (op_cmd)
+                            `OP_EXT_REDRAW: op_framecnt <= {3'd0, op_param};
+                            `OP_EXT_SETMODE: op_framecnt <= {3'd0, op_param};
+                            endcase
+                        end
+                    end
+                    // Update Auto LUT state
+                    if (al_framecnt == 0) begin
+                        if (al_diff_reg) begin
+                            al_framecnt <= csr_lutframe;
+                        end
+                    end
+                    else begin
+                        al_framecnt <= al_framecnt - 1;
+                    end
+                    al_diff_reg <= 1'b0;
                 end
                 else begin
                     scan_h_cnt <= scan_h_cnt + 1;
@@ -150,18 +228,12 @@ module caster(
                 if (scan_h_cnt == H_TOTAL - 1) begin
                     if (scan_v_cnt == V_TOTAL - 1) begin
                         scan_state <= SCAN_IDLE;
-                        // OP state machine here
-                        case (op_state)
-                        OP_INIT: begin
-                            if (op_framecount == OP_INIT_LENGTH - 1) begin
-                                op_state <= OP_NORMAL;
-                                op_framecount <= 0;
-                            end
-                            else begin
-                                op_framecount <= op_framecount + 1;
-                            end
+                        if (op_framecnt == 0) begin
+                            op_state <= `OP_NORMAL;
                         end
-                        endcase
+                        else begin
+                            op_framecnt <= op_framecnt - 1;
+                        end
                     end
                     else begin
                         scan_h_cnt <= 0;
@@ -171,12 +243,15 @@ module caster(
                 else begin
                     scan_h_cnt <= scan_h_cnt + 1;
                 end
+                // Update auto LUT state
+                if (al_diff)
+                    al_diff_reg <= 1'b1;
             end
             endcase
         end
 
-    wire scan_in_vfp = (scan_state != SCAN_IDLE) ? (
-        (scan_v_cnt < V_FP)) : 1'b0;
+    // wire scan_in_vfp = (scan_state != SCAN_IDLE) ? (
+    //     (scan_v_cnt < V_FP)) : 1'b0;
     wire scan_in_vsync = (scan_state != SCAN_IDLE) ? (
         (scan_v_cnt >= V_FP) && 
         (scan_v_cnt < (V_FP + V_SYNC))) : 1'b0;
@@ -214,6 +289,20 @@ module caster(
     // Essentially a scan_in_act but few cycles eariler.
     assign vin_ready = s1_active;
     assign bi_ready = s1_active;
+
+    wire [10:0] h_cnt_offset = scan_h_cnt - (H_FP + H_SYNC + H_BP - PIPELINE_DELAY);
+    wire [10:0] v_cnt_offset = scan_v_cnt - (V_FP + V_SYNC + V_BP);
+    wire [3:0] s1_op_valid;
+    generate
+        for (i = 0; i < 4; i = i + 1) begin: op_valid_assign
+            wire [1:0] offset = i;
+            wire [12:0] h_pixel = {h_cnt_offset, offset};
+            assign s1_op_valid[i] =
+                op_valid &&
+                (h_pixel >= {1'b0, op_left}) && (h_pixel < {1'b0, op_right}) &&
+                ({1'b0, v_cnt_offset} >= op_top) && ({1'b0, v_cnt_offset} < op_bottom);
+        end
+    endgenerate
 
     // STAGE 2
     reg s2_active;
@@ -282,9 +371,11 @@ module caster(
     // vin and bi pixel are duplicated for use in next stage
     reg [63:0] s2_bi_pixel;
     reg [15:0] s2_vin_pixel;
+    reg [3:0] s2_op_valid;
     always @(posedge clk) begin
         s2_vin_pixel <= s1_vin_pixel_y4;
         s2_bi_pixel <= bi_pixel;
+        s2_op_valid <= s1_op_valid;
     end
 
     // STAGE 3
@@ -305,11 +396,18 @@ module caster(
     genvar i;
     generate
         for (i = 0; i < 4; i = i + 1) begin: wvfm_lookup
-            wire [3:0] wvfm_vin = s2_vin_pixel[i*4+3 : i*4];
-            wire [15:0] wvfm_bi = s2_bi_pixel[i*16+15 : i*16];
-            wire [5:0] wvfm_fcnt = wvfm_bi[9:4];
+            wire [3:0] wvfm_vin = s2_vin_pixel[i*4 +: 4];
+            wire [15:0] wvfm_bi = s2_bi_pixel[i*16 +: 16];
+            wire use_local_counter =  wvfm_bi[15];
+            wire [5:0] wvfm_fcnt_global_counter = wvfm_bi[9:4];
+            wire [5:0] wvfm_fcnt_local_counter = op_framecnt[5:0];
+            wire [5:0] wvfm_fcnt = use_local_counter ?
+                    wvfm_fcnt_local_counter : wvfm_fcnt_global_counter;
             wire [5:0] wvfm_fseq = csr_lutframe - wvfm_fcnt;
-            wire [3:0] wvfm_src = wvfm_bi[13:10];
+            wire [3:0] wvfm_src_global_counter = wvfm_bi[13:10];
+            wire [3:0] wvfm_src_local_counter = wvfm_bi[7:4];
+            wire [3:0] wvfm_src = use_local_counter ?
+                    wvfm_src_local_counter : wvfm_src_global_counter;
             wire [3:0] wvfm_tgt = wvfm_bi[3:0];
             assign ram_addr_rd[i] = {wvfm_fseq, wvfm_tgt, wvfm_src};
         end
@@ -344,16 +442,21 @@ module caster(
     reg [63:0] s3_bi_pixel;
     reg [15:0] s3_vin_pixel;
     reg [15:0] s3_pixel_ordered_dithered;
+    reg [3:0] s3_op_valid;
     always @(posedge clk) begin
         s3_vin_pixel <= s2_vin_pixel;
         s3_bi_pixel <= s2_bi_pixel;
         s3_pixel_ordered_dithered <= s2_pixel_ordered_dithered;
+        s3_op_valid <= s2_op_valid;
     end
 
     // STAGE 4
     reg s4_active;
-    always @(posedge clk)
+    reg [3:0] s4_op_valid;
+    always @(posedge clk) begin
         s4_active <= s3_active;
+        s4_op_valid <= s3_op_valid;
+    end
 
     wire [7:0] pixel_comb;
     wire [63:0] bo_pixel_comb;
@@ -379,7 +482,12 @@ module caster(
                 .proc_lut_rd(proc_lut_rd),
                 .proc_output(proc_output),
                 .op_state(op_state),
-                .op_framecount(op_framecount)
+                .op_valid(s4_op_valid[i]),
+                .op_cmd(op_cmd),
+                .op_param(op_param),
+                .op_framecnt(op_framecnt),
+                .al_framecnt(al_framecnt),
+                .al_diff(al_diff)
             );
 
             // Output

@@ -12,36 +12,39 @@
 // Combinational single pixel processing
 `timescale 1ns / 1ps
 `default_nettype none
+`include "defines.vh"
 module pixel_processing(
-    input  wire [5:0]  csr_lutframe,// Frame count for currently loaded LUT
+    input  wire [5:0]  csr_lutframe,// Total frames in LUT
     input  wire [3:0]  proc_p_or,   // Original pixel
     input  wire [3:0]  proc_p_od,   // Ordered dithered pixel to 1-bit
     input  wire [3:0]  proc_p_e1,   // Error diffusion dithered pixel to 1-bit
     input  wire [3:0]  proc_p_e4,   // Error diffusion dithered pixel to 4-bit
     input  wire [15:0] proc_bi,     // Pixel state input from VRAM
-    output wire [15:0] proc_bo,     // Pixel state output to VRAM
+    output reg  [15:0] proc_bo,     // Pixel state output to VRAM
     input  wire [1:0]  proc_lut_rd, // Read out from LUT
-    output wire [1:0]  proc_output, // Output to screen
+    output reg  [1:0]  proc_output, // Output to screen
     input  wire [1:0]  op_state,    // Current overall operating state
-    input  wire [10:0] op_framecount// Current overall frame counter for state
+    input  wire        op_valid,    // External operation enable
+    input  wire [7:0]  op_cmd,      // External operation command
+    input  wire [7:0]  op_param,    // External operation parameter
+    input  wire [10:0] op_framecnt, // Current overall frame counter for state
+    input  wire [5:0]  al_framecnt, // Auto LUT mode frame counter
+    output reg         al_diff      // Auto LUT mode input change detected
 );
-    localparam OP_INIT = 2'd0; // Initial power up
-    localparam OP_NORMAL = 2'd1; // Normal operation
-    localparam OP_CLEAR_NORMAL = 2'd2; // In place screen clear
 
     // Pixel state: 16bits
     // Bit 15-12: Mode
     // Bit 13-12 is shared
-    localparam MODE_NORMAL_LUT_NO_DITHER = 2'd0; // 00xx
-    localparam MODE_NORMAL_LUT_ERROR_DIFFUSION = 2'd1; // 01xx
+    localparam MODE_MANUAL_LUT_NO_DITHER = 2'd0; // 00xx
+    localparam MODE_MANUAL_LUT_ERROR_DIFFUSION = 2'd1; // 01xx
     localparam MODE_FAST_MONO_NO_DITHER = 4'd8; // 1000
     localparam MODE_FAST_MONO_ORDERED = 4'd9; // 1001
     localparam MODE_FAST_MONO_ERROR_DIFFUSION = 4'd10; // 1010
     localparam MODE_FAST_GREY = 4'd11; // 1011
-    localparam MODE_RESERVED1 = 4'd12; // 1100
-    localparam MODE_RESERVED2 = 4'd13; // 1101
-    localparam MODE_RESERVED3 = 4'd14; // 1100
-    localparam MODE_RESERVED4 = 4'd15; // 1101
+    localparam MODE_AUTO_LUT_NO_DITHER = 4'd12; // 1100
+    localparam MODE_AUTO_LUT_ERROR_DIFFUSION = 4'd13; // 1101
+    localparam MODE_RESERVED1 = 4'd14; // 1100
+    localparam MODE_RESERVED2 = 4'd15; // 1101
 
     //localparam FASTM_B2W_FRAMES = 6'd9;
     //localparam FASTM_W2B_FRAMES = 6'd9;
@@ -57,17 +60,31 @@ module pixel_processing(
     localparam FASTG_LG2W_FRAMES = 6'd5;
     localparam FASTG_DG2W_FRAMES = 6'd8;
 
-    // In normal LUT mode:
+    // In auto LUT mode:
+    // Bit 11-8: Reserved
+    // Bit 7-4: Source pixel value
+    // Bit 3-0: Target pixel value
+    // Auto LUT mode uses a global framecounter due to insufficient bits inside
+    // state buffer.
+    // When frame counter is not 0, waveform lookup is in progress.
+    // When lookup is in progress, the state is kept in still, until the last
+    // frame where the dest value is copied to source value.
+    // When lookup is not in progress, the input pixel and source pixel
+    // value is compared. If doesn't match, a flag is output to the external
+    // logic for determining the region of update. The destination pixel value
+    // is always updated.
+
+    // In manual LUT mode:
     // Bit 13-10: Source pixel value
     // Bit 9-4: Frame counter
     // Bit 3-0: Target pixel value
     // When frame counter is not 0, waveform lookup is in progress.
     // When lookup is in progress, both target and source pixel value are hold
     // still, and the frame counter is decremented.
-    // When lookup is not in progress, the input pixel and old target pixel
-    // value is compared. If doesn't match, the input pixel is copied to target
-    // pixel value, the old target pixel value is copied to source pixel
-    // value, and the frame counter is set to LUT frame length.
+    // When lookup is not in progress and an external update is request on the
+    // region, the input pixel is copied to target pixel value, the old target
+    // pixel value (current screen status) is copied to target pixel value, and
+    // the frame counter is set to LUT frame length.
 
     // In fast mono mode:
     // Bit 11-10: Reserved
@@ -91,6 +108,7 @@ module pixel_processing(
     wire [3:0] pixel_mode = proc_bi[15:12];
     wire [1:0] pixel_stage = proc_bi[11:10];
     wire [5:0] pixel_framecnt = proc_bi[9:4];
+    wire [3:0] pixel_autolut_src = proc_bi[7:4];
     wire [3:0] pixel_prev = proc_bi[3:0];
     wire [5:0] pixel_framecnt_dec = pixel_framecnt - 1;
     // Specific to fast mono mode
@@ -100,26 +118,34 @@ module pixel_processing(
     wire [5:0] pixel_framecnt_oppo = FASTM_B2W_FRAMES - FASTG_B2G_FRAMES + pixel_framecnt;
 
     // Decode base mode and dither mode
-    localparam BASEMODE_NORMAL_LUT = 2'b00;
+    localparam BASEMODE_MANUAL_LUT = 2'b00;
     localparam BASEMODE_FAST_MONO = 2'b01;
     localparam BASEMODE_FAST_GREY = 2'b10;
-    localparam BASEMODE_RESERVED = 2'b11;
+    localparam BASEMODE_AUTO_LUT = 2'b11;
 
     localparam DITHER_NONE = 2'b00;
     localparam DITHER_ORDERED = 2'b01;
     localparam DITHER_ED_1BIT = 2'b10;
     localparam DITHER_ED_4BIT = 2'b11;
 
+    wire [15:0] initial_mode = {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0};
+
+    // EX op decoding sorta
+    wire manual_lut_update_en = op_valid && (op_cmd == `OP_EXT_REDRAW);
+    wire set_mode_en = op_valid && (op_cmd == `OP_EXT_SETMODE);
+    wire set_mode_clear = set_mode_en && (op_framecnt != 0);
+    wire set_mode_apply = set_mode_en && (op_framecnt == 0);
+
     reg [1:0] pixel_basemode;
     reg [1:0] pixel_dither;
     always @(*) begin
         case (pixel_mode_hi)
-        MODE_NORMAL_LUT_NO_DITHER: begin
-            pixel_basemode = BASEMODE_NORMAL_LUT;
+        MODE_MANUAL_LUT_NO_DITHER: begin
+            pixel_basemode = BASEMODE_MANUAL_LUT;
             pixel_dither = DITHER_NONE;
         end
-        MODE_NORMAL_LUT_ERROR_DIFFUSION: begin
-            pixel_basemode = BASEMODE_NORMAL_LUT;
+        MODE_MANUAL_LUT_ERROR_DIFFUSION: begin
+            pixel_basemode = BASEMODE_MANUAL_LUT;
             pixel_dither = DITHER_ED_4BIT;
         end
         default: begin
@@ -140,6 +166,14 @@ module pixel_processing(
                 pixel_basemode = BASEMODE_FAST_GREY;
                 pixel_dither = DITHER_NONE;
             end
+            MODE_AUTO_LUT_NO_DITHER: begin
+                pixel_basemode = BASEMODE_AUTO_LUT;
+                pixel_dither = DITHER_NONE;
+            end
+            MODE_AUTO_LUT_ERROR_DIFFUSION: begin
+                pixel_basemode = BASEMODE_AUTO_LUT;
+                pixel_dither = DITHER_ED_4BIT;
+            end
             default: begin
                 // Fallback, todo: report this as an error
                 pixel_basemode = BASEMODE_FAST_MONO;
@@ -150,204 +184,216 @@ module pixel_processing(
         endcase
     end
 
-    wire [3:0] proc_vin = proc_p_or;
-        // (pixel_dither == DITHER_NONE) ? (proc_p_or) :
-        // (pixel_dither == DITHER_ORDERED) ? (proc_p_od) :
-        // (pixel_dither == DITHER_ED_1BIT) ? (proc_p_e1) : (proc_p_e4);
+    wire [3:0] proc_vin = set_mode_clear ? 4'b11 :
+        (pixel_dither == DITHER_NONE) ? (proc_p_or) :
+        (pixel_dither == DITHER_ORDERED) ? (proc_p_od) :
+        (pixel_dither == DITHER_ED_1BIT) ? (proc_p_e1) : (proc_p_e4);
 
-    assign proc_output =
-        (op_state == OP_INIT) ? (
-            // Init state
-            (op_framecount < 11'd10) ? 2'b00 :
-            (op_framecount < 11'd58) ? 2'b01 :
-            (op_framecount < 11'd60) ? 2'b00 :
-            (op_framecount < 11'd108) ? 2'b10 :
-            (op_framecount < 11'd110) ? 2'b00 :
-            (op_framecount < 11'd178) ? 2'b01 :
-            (op_framecount < 11'd180) ? 2'b00 :
-            (op_framecount < 11'd258) ? 2'b10 :
-            (op_framecount < 11'd260) ? 2'b00 :
-            (op_framecount < 11'd278) ? 2'b01 :
-            (op_framecount < 11'd280) ? 2'b00 :
-            (op_framecount < 11'd298) ? 2'b10 :
-            (op_framecount < 11'd300) ? 2'b00 :
-            (op_framecount < 11'd318) ? 2'b01 :
-            (op_framecount < 11'd320) ? 2'b00 :
-            (op_framecount < 11'd338) ? 2'b10 :
-                                        2'b00
-        ) : ((op_state == OP_NORMAL) ? (
-            // Normal state
-            (pixel_basemode == BASEMODE_NORMAL_LUT) ? (
-                // Normal LUT mode
-                (pixel_framecnt != 0) ? (proc_lut_rd) : 2'b00
-            ) : (pixel_basemode == BASEMODE_FAST_MONO) ? (
-                // Fast mono mode
-                (pixel_framecnt != 0) ? (
-                    // Currently updating
-                    // For now, just continue
-                    //pixel_prev[0] ? 2'b10 : 2'b01
-                    // Or, respond to input!
-                    proc_vin[3] ? 2'b10 : 2'b01
-                ) : (
-                    // Currently not updating
-                    (proc_vin[3] == pixel_prev[0]) ? (
-                        // Pixel state did not change, no op
-                        2'b00
-                    ) : (
-                        // Pixel state changed, update
-                        proc_vin[3] ? 2'b10 : 2'b01
-                    )
-                )
-            ) : (pixel_basemode == BASEMODE_FAST_GREY) ? (
-                // Fast grey mode
-                ((pixel_stage == STAGE_DONE) || (pixel_stage == STAGE_HOLD)) ? (
-                    // Currently not updating
-                    (proc_vin[3:2] == pixel_prev[1:0]) ? (
-                        // Pixel state did not change, no op
-                        2'b00
-                    ) : (
-                        // Pixel state changed, update
-                        proc_vin[3] ? 2'b10 : 2'b01
-                    )
-                ) : (pixel_stage == STAGE_MONO) ? (
-                    // Fast mono stage, always drive towards input
-                    proc_vin[3] ? 2'b10 : 2'b01
-                ) : (
-                    // Grey mode, non cancellable, drive towards old value
-                    pixel_prev[1] ? 2'b01 : 2'b10
-                )
-            ) : 2'b00 // Unknown mode
-        ) : (
-            2'b00 // Unknwon state
-        ));
-    assign proc_bo =
-        (op_state == OP_INIT) ? (
-            //{MODE_FAST_MONO_NO_DITHER, 2'b0, 6'd0, 3'b0, 1'b1}
-            //{MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'b0, 2'b11}
-            {MODE_NORMAL_LUT_NO_DITHER, 4'd0, 6'd0, 4'd15}
-        ) : (op_state == OP_NORMAL) ? (
-            // Normal state
-            (pixel_basemode == BASEMODE_NORMAL_LUT) ? (
-                // Normal LUT mode
-                (pixel_framecnt != 0) ? (
-                    // Currently updating, continue
-                    {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]}
-                ) : (
-                    (proc_vin == pixel_prev) ? (
-                        // Pixel not changed, keep
-                        proc_bi
-                    ) : (
-                        // Pixel changed, initiate update
-                        {proc_bi[15:14], pixel_prev, csr_lutframe, proc_vin}
-                    )
-                )
-            ) : (pixel_basemode == BASEMODE_FAST_MONO) ? (
-                // Fast mono mode
-                (pixel_framecnt != 0) ? (
-                    // Currently updating
-                    // For now, just continue
-                    //{proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]}
-                    // Respond to input!
-                    (proc_vin[3] == pixel_prev[0]) ? (
-                        // Pixel state did not change, continue
-                        {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]}
-                    ) : (
-                        // Pixel state changed, update
-                        proc_vin[3] ? (
-                            {proc_bi[15:10], pixel_framecnt_2w, 4'd1}
-                        ) : {proc_bi[15:10], pixel_framecnt_2b, 4'd0}
-                    )
-                ) : (
-                    // Currently not updating
-                    (proc_vin[3] == pixel_prev[0]) ? (
-                        // Pixel state did not change, no op
-                        proc_bi
-                    ) : (
-                        // Pixel state changed, update
-                        proc_vin[3] ? (
-                            {proc_bi[15:10], FASTM_B2W_FRAMES, 4'd1}
-                        ) : {proc_bi[15:10], FASTM_W2B_FRAMES, 4'd0}
-                    )
-                )
-            ) : (pixel_basemode == BASEMODE_FAST_GREY) ? (
-                // Fast grey mode
-                (proc_vin[3:2] == pixel_prev[1:0]) ? (
-                    // Pixel didn't change, continue
-                    (pixel_stage == STAGE_DONE) ? (
-                        proc_bi // Stay
-                    ) : (pixel_stage == STAGE_MONO) ? (
-                        (pixel_framecnt == 0) ? (
-                            {proc_bi[15:12], STAGE_HOLD, FASTG_HOLDOFF_FRAMES, proc_bi[3:0]}
-                        ) : (
-                            {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]}
-                        )
-                    ) : (pixel_stage == STAGE_HOLD) ? (
-                        (pixel_framecnt == 0) ? (
-                            (pixel_prev[1:0] == 2'b10) ? (
-                                {proc_bi[15:12], STAGE_GREY, FASTG_W2G_FRAMES, proc_bi[3:0]}
-                            ) : (pixel_prev[1:0] == 2'b01) ? (
-                                {proc_bi[15:12], STAGE_GREY, FASTG_B2G_FRAMES, proc_bi[3:0]}
-                            ) : (
-                                {proc_bi[15:12], STAGE_DONE, 6'd0, 2'b00, proc_vin[3:2]}
-                            )
-                        ) : (
-                            {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]}
-                        )
-                    ) : (
-                        // Grey
-                        (pixel_framecnt == 0) ? (
-                            {proc_bi[15:12], STAGE_DONE, 6'd0, proc_bi[3:0]}
-                        ) : (
-                            {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]}
-                        )
-                    )
-                ) : (
-                    ((pixel_stage == STAGE_DONE) || (pixel_stage == STAGE_HOLD)) ? (
-                        proc_vin[3] ? (
-                            (pixel_prev[1:0] == 2'b10) ? (
+    `define NO_DRIVE    2'b00
+    `define DRIVE_BLACK 2'b01
+    `define DRIVE_WHITE 2'b10
+
+    wire [1:0] drive_towards_input = proc_vin[3] ? `DRIVE_WHITE: `DRIVE_BLACK;
+
+    always @(*) begin
+        // Normal mode, init mode override later
+        al_diff = 1'b0;
+        case (pixel_basemode)
+        BASEMODE_MANUAL_LUT: begin
+            if (pixel_framecnt != 0) begin
+                // Update in progress, ignore update/ external request
+                proc_output = proc_lut_rd;
+                proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+            end
+            else begin
+                proc_output = `NO_DRIVE; // TODO: Reduce this latency
+                if (manual_lut_update_en) begin
+                    // Update requested, initiate update
+                    proc_bo = {proc_bi[15:14], pixel_prev, csr_lutframe, proc_vin};
+                end
+                else begin
+                    proc_bo = proc_bi;
+                end
+            end
+        end
+        BASEMODE_AUTO_LUT: begin
+            if (al_framecnt != 0) begin
+                // Update in progress
+                proc_output = proc_lut_rd;
+                if (al_framecnt == 1) begin
+                    // Last frame, copy destination value to source value
+                    proc_bo = {proc_bi[15:8], pixel_prev, proc_vin};
+                end
+                else begin
+                    proc_bo = proc_bi;
+                end
+            end
+            else begin
+                // Not updating, keep old source, update destination
+                proc_output = `NO_DRIVE;
+                proc_bo = {proc_bi[15:4], proc_vin};
+                if (proc_vin != pixel_autolut_src)
+                    al_diff = 1'b1;
+            end
+        end
+        BASEMODE_FAST_MONO: begin
+            if (pixel_framecnt != 0) begin
+                // Currently updating
+                proc_output = drive_towards_input;
+                if (proc_vin[3] != pixel_prev[0]) begin
+                    // Pixel state changed
+                    proc_bo = proc_vin[3] ? (
+                        {proc_bi[15:10], pixel_framecnt_2w, 4'd1}
+                    ) : {proc_bi[15:10], pixel_framecnt_2b, 4'd0};
+                end
+                else begin
+                    // Pixel state not changed
+                    proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+                end
+            end
+            else begin
+                // Not currently updating
+                if (proc_vin[3] != pixel_prev[0]) begin
+                    // Pixel state changed
+                    proc_output = drive_towards_input;
+                    proc_bo = proc_vin[3] ? (
+                        {proc_bi[15:10], FASTM_B2W_FRAMES, 4'd1}
+                    ) : {proc_bi[15:10], FASTM_W2B_FRAMES, 4'd0};
+                end
+                else begin
+                    // Pixel state not changed
+                    proc_output = `NO_DRIVE;
+                    proc_bo = proc_bi;
+                end
+            end
+        end
+        BASEMODE_FAST_GREY: begin
+            if ((pixel_stage == STAGE_DONE) || (pixel_stage == STAGE_HOLD)) begin
+                // Currently not updating
+                if (proc_vin[3:2] == pixel_prev[1:0]) begin
+                    // Pixel state didn't change
+                    proc_output = `NO_DRIVE;
+                    if (pixel_stage == STAGE_DONE) begin
+                        proc_bo = proc_bi;
+                    end
+                    else begin
+                        // Hold mode, update status counter
+                        if (pixel_framecnt == 0) begin
+                            proc_bo =  (pixel_prev[1:0] == 2'b10) ? (
+                                    {proc_bi[15:12], STAGE_GREY, FASTG_W2G_FRAMES, proc_bi[3:0]}
+                                ) : (pixel_prev[1:0] == 2'b01) ? (
+                                    {proc_bi[15:12], STAGE_GREY, FASTG_B2G_FRAMES, proc_bi[3:0]}
+                                ) : (
+                                    {proc_bi[15:12], STAGE_DONE, 6'd0, 2'b00, proc_vin[3:2]}
+                                );
+                        end
+                        else begin
+                            proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+                        end
+                    end
+                end
+                else begin
+                    // Pixel state changed, start update
+                    proc_output = drive_towards_input;
+                    if (proc_vin[3]) begin
+                        // White / light grey
+                        proc_bo = (pixel_prev[1:0] == 2'b10) ? (
                                 {proc_bi[15:12], STAGE_MONO, FASTG_LG2W_FRAMES, 2'b00, proc_vin[3:2]}
                             ) : (pixel_prev[1:0] == 2'b01) ? (
                                 {proc_bi[15:12], STAGE_MONO, FASTG_DG2W_FRAMES, 2'b00, proc_vin[3:2]}
                             ) : (
                                 {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, 2'b00, proc_vin[3:2]}
-                            )
-                        ) : (
-                            (pixel_prev[1:0] == 2'b10) ? (
+                            );
+                    end
+                    else begin
+                        // Black / dark grey
+                        proc_bo = (pixel_prev[1:0] == 2'b10) ? (
                                 {proc_bi[15:12], STAGE_MONO, FASTG_LG2B_FRAMES, 2'b00, proc_vin[3:2]}
                             ) : (pixel_prev[1:0] == 2'b01) ? (
                                 {proc_bi[15:12], STAGE_MONO, FASTG_DG2B_FRAMES, 2'b00, proc_vin[3:2]}
                             ) : (
                                 {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, 2'b00, proc_vin[3:2]}
-                            )
-                        )
-                    ) : (pixel_stage == STAGE_MONO) ? (
-                        // Pixel state changed, update
-                        proc_vin[3] ? (
-                            {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2w, 2'b00, proc_vin[3:2]}
-                        ) : (
-                            {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2b, 2'b00, proc_vin[3:2]}
-                        )
-                    ) : (
-                        // Stage grey
-                        /*(proc_vin[3] == pixel_prev[1]) ? (
-                            // Back to previous color
-                            {proc_bi[15:12], STAGE_MONO, pixel_framecnt_back, 2'b00, proc_vin[3:2]}
-                        ) : (
-                            // To another side
-                            {proc_bi[15:12], STAGE_MONO, pixel_framecnt_oppo, 2'b00, proc_vin[3:2]}
-                        )*/
-                        // Non cancellable
-                        (pixel_framecnt == 0) ? (
-                            {proc_bi[15:12], STAGE_DONE, 6'd0, proc_bi[3:0]}
-                        ) : (
-                            {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]}
-                        )
-                    )
-                )
-            ) : 16'h00 // Unknown mode
-        ) : (
-            16'h00 // Unknwon state
-        );
+                            );
+                    end
+                end
+            end
+            else if (pixel_stage == STAGE_MONO) begin
+                // Fast mono stage, always drive towards input
+                proc_output = drive_towards_input;
+                if (proc_vin[3:2] == pixel_prev[1:0]) begin
+                    // Pixel didn't change, continue
+                    if (pixel_framecnt == 0) begin
+                        proc_bo = {proc_bi[15:12], STAGE_HOLD, FASTG_HOLDOFF_FRAMES, proc_bi[3:0]};
+                    end
+                    else begin
+                        proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+                    end
+                end
+                else begin
+                    if (proc_vin[3]) begin
+                        // White
+                        proc_bo = {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2w, 2'b00, proc_vin[3:2]};
+                    end
+                    else begin
+                        // Black
+                        proc_bo = {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2b, 2'b00, proc_vin[3:2]};
+                    end
+                end
+            end
+            else begin
+                // Grey stage, non cancellable, drive based on old value
+                proc_output = pixel_prev[1] ? `DRIVE_BLACK : `DRIVE_WHITE;
+                if (pixel_framecnt == 0) begin
+                    proc_bo = {proc_bi[15:12], STAGE_DONE, 6'd0, proc_bi[3:0]};
+                end
+                else begin
+                    proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+                end
+            end
+        end
+        endcase
+
+        // If set mode is active, override previous
+        if (set_mode_apply) begin
+            // Use the initial state preset
+            proc_bo = initial_mode; // Default
+            case (op_param)
+            `SETMODE_MANUAL_LUT_NO_DITHER:
+                proc_bo = {MODE_MANUAL_LUT_NO_DITHER, 4'd0, 6'd0, 4'd15};
+            `SETMODE_MANUAL_LUT_ERROR_DIFFUSION:
+                proc_bo = {MODE_MANUAL_LUT_ERROR_DIFFUSION, 4'd0, 6'd0, 4'd15};
+            `SETMODE_FAST_MONO_NO_DITHER:
+                proc_bo = {MODE_FAST_MONO_NO_DITHER, 2'b0, 6'd0, 3'b0, 1'b1};
+            `SETMODE_FAST_MONO_ORDERED:
+                proc_bo = {MODE_FAST_MONO_ORDERED, 2'b0, 6'd0, 3'b0, 1'b1};
+            `SETMODE_FAST_MONO_ERROR_DIFFUSION:
+                proc_bo = {MODE_FAST_MONO_ERROR_DIFFUSION, 2'b0, 6'd0, 3'b0, 1'b1};
+            `SETMODE_FAST_GREY:
+                proc_bo = {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'b0, 2'b11};
+            `SETMODE_AUTO_LUT_NO_DITHER:
+                proc_bo = {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0};
+            `SETMODE_AUTO_LUT_ERROR_DIFFUSION:
+                proc_bo = {MODE_AUTO_LUT_ERROR_DIFFUSION, 4'd0, 4'd15, 4'd0};
+            endcase
+        end
+
+        // If in init mode, override previous
+        if (op_state == `OP_INIT) begin
+            // one round is 128 clock cycle [6:0]
+            // 6543210
+            // x000xxx - 0-7 / 64-71 noop
+            // 0xxxxxx - 8-63 black
+            // 1xxxxxx - 72-127 white
+            if (op_framecnt[5:3] == 3'b0)
+                proc_output = `NO_DRIVE;
+            else if (op_framecnt[6] == 1'b0)
+                proc_output = `DRIVE_BLACK;
+            else
+                proc_output = `DRIVE_WHITE;
+            // Set initial mode
+            proc_bo = initial_mode;
+        end
+    end
 
 endmodule
 `default_nettype wire

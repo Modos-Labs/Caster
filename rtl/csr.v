@@ -44,7 +44,7 @@ module csr(
     reg last_sck;
     reg [1:0] spi_state;
     reg [2:0] bit_counter;
-    reg [7:0] spi_rx;
+    reg [6:0] spi_rx;
     reg [7:0] spi_tx;
 
     wire [7:0] spi_rx_next = {spi_rx[6:0], spi_mosi};
@@ -94,7 +94,7 @@ module csr(
         end
         else if (!last_sck && spi_sck) begin
             // SCK posedge
-            spi_rx <= spi_rx_next;
+            spi_rx <= spi_rx_next[6:0];
             bit_counter <= bit_counter + 1;
             if (bit_counter == 3'd7) begin
                 case (spi_state)
