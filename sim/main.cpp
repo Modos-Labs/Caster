@@ -33,6 +33,7 @@
 #include "dispsim.h"
 #include "srcsim.h"
 #include "vramsim.h"
+#include "spisim.h"
 
 #define SIM_STEP 100000
 //#define MAX_CYCLES 500000
@@ -59,6 +60,9 @@ void tick() {
     uint8_t vin_valid;
     uint64_t bi_pixel;
     uint8_t bi_valid;
+    uint8_t spi_cs;
+    uint8_t spi_sck;
+    uint8_t spi_mosi;
 
     // Call simulated modules
     dispsim_apply(
@@ -85,6 +89,12 @@ void tick() {
         core->bo_pixel,
         core->bo_valid
     );
+    spisim_apply(
+        spi_cs,
+        spi_sck,
+        spi_mosi,
+        core->spi_miso
+    );
 
     // Posedge
     core->clk = 1;
@@ -96,6 +106,9 @@ void tick() {
     core->vin_valid = vin_valid;
     core->bi_pixel = bi_pixel;
     core->bi_valid = bi_valid;
+    core->spi_cs = spi_cs;
+    core->spi_sck = spi_sck;
+    core->spi_mosi = spi_mosi;
 
     // Let combinational changes propagate
     core->eval();
@@ -119,6 +132,7 @@ void reset() {
     dispsim_reset();
     srcsim_reset();
     vramsim_reset();
+    spisim_reset();
     core->sys_ready = 1;
 }
 

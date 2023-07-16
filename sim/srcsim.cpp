@@ -128,12 +128,44 @@ void srcsim_next_frame() {
         pixels[DISP_WIDTH * i] = 0x00;
         pixels[DISP_WIDTH * i + DISP_WIDTH - 1] = 0x00;
     }
-#elif 1 // Image source
-    static int initial_frame = 1;
-    if (!initial_frame)
+#elif 1 // Just full screen fixed color
+    memset(pixels, 0x00, DISP_WIDTH * DISP_HEIGHT / 4);
+    memset(pixels + DISP_WIDTH * DISP_HEIGHT / 4, 0x55, DISP_WIDTH * DISP_HEIGHT / 4);
+    memset(pixels + DISP_WIDTH * DISP_HEIGHT / 2, 0xaa, DISP_WIDTH * DISP_HEIGHT / 4);
+    memset(pixels + DISP_WIDTH * DISP_HEIGHT / 4 * 3, 0xff, DISP_WIDTH * DISP_HEIGHT / 4);
+#elif 0 // Full screen fixed color, reverse 200 frames later
+    uint8_t colors[4];
+    if (frame_counter < 100) {
+        colors[0] = 0x00;
+        colors[1] = 0x55;
+        colors[2] = 0xaa;
+        colors[3] = 0xff;
+    }
+    else {
+        colors[0] = 0xff;
+        colors[1] = 0xaa;
+        colors[2] = 0x55;
+        colors[3] = 0x00;
+    }
+    memset(pixels, colors[0], DISP_WIDTH * DISP_HEIGHT / 4);
+    memset(pixels + DISP_WIDTH * DISP_HEIGHT / 4, colors[1], DISP_WIDTH * DISP_HEIGHT / 4);
+    memset(pixels + DISP_WIDTH * DISP_HEIGHT / 2, colors[2], DISP_WIDTH * DISP_HEIGHT / 4);
+    memset(pixels + DISP_WIDTH * DISP_HEIGHT / 4 * 3, colors[3], DISP_WIDTH * DISP_HEIGHT / 4);
+    frame_counter++;
+    if (frame_counter == 200)
+        frame_counter = 0;
+#elif 0 // Image source
+    if ((frame_counter % 100) != 0) {
+        frame_counter++;
+        if (frame_counter == 400)
+            frame_counter = 0;
         return;
+    }
+    frame_counter++;
+    char fn[10];
+    sprintf(fn, "test%d.jpg", frame_counter / 100);
     int x, y, n;
-    uint8_t *data = stbi_load("test1.jpg", &x, &y, &n, 0);
+    uint8_t *data = stbi_load(fn, &x, &y, &n, 0);
     printf("Input image size %d x %d (%d channels)\n", x, y, n);
     uint8_t *scaled = (uint8_t *)calloc(1, DISP_WIDTH * DISP_HEIGHT * n);
     float scalex, scaley;
@@ -184,7 +216,6 @@ void srcsim_next_frame() {
         memcpy(wrptr, rdptr, DISP_WIDTH * DISP_HEIGHT);
     }
     free(scaled);
-    initial_frame = 0;
 #endif
 }
 
