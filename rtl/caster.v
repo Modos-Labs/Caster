@@ -393,6 +393,10 @@ module caster(
     genvar i;
     generate
         for (i = 0; i < 4; i = i + 1) begin: wvfm_lookup
+            // See pixel_processing.v comments for more details
+            // Only used for LUT modes.
+            // Local counter (per pixel counter) is used for manual LUT modes
+            // Global counter is used for auto LUT modes
             wire [3:0] wvfm_vin = s2_vin_pixel[i*4 +: 4];
             wire [15:0] wvfm_bi = s2_bi_pixel[i*16 +: 16];
             wire use_local_counter =  wvfm_bi[15];
@@ -457,6 +461,7 @@ module caster(
 
     wire [7:0] pixel_comb;
     wire [63:0] bo_pixel_comb;
+    wire [3:0] al_diff_pixel;
     generate
         for (i = 0; i < 4; i = i + 1) begin: pix_proc
             wire [3:0] proc_p_or = s3_vin_pixel[i*4+3 : i*4];
@@ -484,7 +489,7 @@ module caster(
                 .op_param(op_param),
                 .op_framecnt(op_framecnt),
                 .al_framecnt(al_framecnt),
-                .al_diff(al_diff)
+                .al_diff(al_diff_pixel[i])
             );
 
             // Output
@@ -492,6 +497,7 @@ module caster(
             assign bo_pixel_comb[i*16+15 : i*16] = proc_bo;
         end
     endgenerate
+    assign al_diff = s4_active && (|al_diff_pixel);
 
     reg [7:0] current_pixel;
     always @(posedge clk) begin
