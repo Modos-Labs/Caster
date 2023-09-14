@@ -71,7 +71,7 @@ module caster(
     localparam SCAN_WAITING = 2'd1;
     localparam SCAN_RUNNING = 2'd2;
 
-    localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 340 : 2; // 240 frames, (black, white)x4
+    localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 256 : 2;
 
     // Internal design specific
     localparam VS_DELAY = 8; // wait 8 clocks after VS is vaild
@@ -174,81 +174,78 @@ module caster(
     reg al_diff_reg;
     wire al_diff;
 
-    always @(posedge clk)
+    always @(posedge clk) begin
+        case (scan_state)
+        SCAN_IDLE: begin
+            if ((sys_ready) && (vin_vsync)) begin
+                scan_state <= SCAN_WAITING;
+            end
+            scan_h_cnt <= 0;
+            scan_v_cnt <= 0;
+        end
+        SCAN_WAITING: begin
+            if (scan_h_cnt == VS_DELAY) begin
+                scan_state <= SCAN_RUNNING;
+                scan_h_cnt <= 0;
+                // Set frame count limit here
+                if (op_framecnt == 0) begin
+                    if (op_state == `OP_INIT) begin
+                        op_state <= `OP_NORMAL;
+                    end
+                    else if (op_valid) begin
+                        case (op_cmd)
+                        `OP_EXT_REDRAW: op_framecnt <= {3'd0, op_param};
+                        `OP_EXT_SETMODE: op_framecnt <= {3'd0, op_param};
+                        endcase
+                    end
+                end
+                else begin
+                    op_framecnt <= op_framecnt - 1;
+                end
+                // Update Auto LUT state
+                if (al_framecnt == 0) begin
+                    if (al_diff_reg) begin
+                        al_framecnt <= csr_lutframe;
+                    end
+                end
+                else begin
+                    al_framecnt <= al_framecnt - 1;
+                end
+                al_diff_reg <= 1'b0;
+            end
+            else begin
+                scan_h_cnt <= scan_h_cnt + 1;
+            end
+        end
+        SCAN_RUNNING: begin
+            if (scan_h_cnt == H_TOTAL - 1) begin
+                if (scan_v_cnt == V_TOTAL - 1) begin
+                    scan_state <= SCAN_IDLE;
+                end
+                else begin
+                    scan_h_cnt <= 0;
+                    scan_v_cnt <= scan_v_cnt + 1;
+                end
+            end
+            else begin
+                scan_h_cnt <= scan_h_cnt + 1;
+            end
+            // Update auto LUT state
+            if (al_diff)
+                al_diff_reg <= 1'b1;
+        end
+        endcase
+
         if (rst) begin
             scan_state <= SCAN_IDLE;
             scan_h_cnt <= 0;
             scan_v_cnt <= 0;
             op_state <= `OP_INIT;
-            op_framecnt <= 0;
+            op_framecnt <= OP_INIT_LENGTH;
             al_diff_reg <= 0;
             al_framecnt <= 0;
         end
-        else begin
-            case (scan_state)
-            SCAN_IDLE: begin
-                if ((sys_ready) && (vin_vsync)) begin
-                    scan_state <= SCAN_WAITING;
-                end
-                scan_h_cnt <= 0;
-                scan_v_cnt <= 0;
-            end
-            SCAN_WAITING: begin
-                if (scan_h_cnt == VS_DELAY) begin
-                    scan_state <= SCAN_RUNNING;
-                    scan_h_cnt <= 0;
-                    // Set frame count limit here
-                    if (op_framecnt == 0) begin
-                        if (op_state == `OP_INIT) begin
-                            op_framecnt <= OP_INIT_LENGTH;
-                        end
-                        else if (op_valid) begin
-                            case (op_cmd)
-                            `OP_EXT_REDRAW: op_framecnt <= {3'd0, op_param};
-                            `OP_EXT_SETMODE: op_framecnt <= {3'd0, op_param};
-                            endcase
-                        end
-                    end
-                    // Update Auto LUT state
-                    if (al_framecnt == 0) begin
-                        if (al_diff_reg) begin
-                            al_framecnt <= csr_lutframe;
-                        end
-                    end
-                    else begin
-                        al_framecnt <= al_framecnt - 1;
-                    end
-                    al_diff_reg <= 1'b0;
-                end
-                else begin
-                    scan_h_cnt <= scan_h_cnt + 1;
-                end
-            end
-            SCAN_RUNNING: begin
-                if (scan_h_cnt == H_TOTAL - 1) begin
-                    if (scan_v_cnt == V_TOTAL - 1) begin
-                        scan_state <= SCAN_IDLE;
-                        if (op_framecnt == 0) begin
-                            op_state <= `OP_NORMAL;
-                        end
-                        else begin
-                            op_framecnt <= op_framecnt - 1;
-                        end
-                    end
-                    else begin
-                        scan_h_cnt <= 0;
-                        scan_v_cnt <= scan_v_cnt + 1;
-                    end
-                end
-                else begin
-                    scan_h_cnt <= scan_h_cnt + 1;
-                end
-                // Update auto LUT state
-                if (al_diff)
-                    al_diff_reg <= 1'b1;
-            end
-            endcase
-        end
+    end
 
     // wire scan_in_vfp = (scan_state != SCAN_IDLE) ? (
     //     (scan_v_cnt < V_FP)) : 1'b0;
@@ -400,7 +397,7 @@ module caster(
             wire [15:0] wvfm_bi = s2_bi_pixel[i*16 +: 16];
             wire use_local_counter =  wvfm_bi[15];
             wire [5:0] wvfm_fcnt_global_counter = wvfm_bi[9:4];
-            wire [5:0] wvfm_fcnt_local_counter = op_framecnt[5:0];
+            wire [5:0] wvfm_fcnt_local_counter = al_framecnt;
             wire [5:0] wvfm_fcnt = use_local_counter ?
                     wvfm_fcnt_local_counter : wvfm_fcnt_global_counter;
             wire [5:0] wvfm_fseq = csr_lutframe - wvfm_fcnt;

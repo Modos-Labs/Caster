@@ -379,14 +379,14 @@ module pixel_processing(
 
         // If in init mode, override previous
         if (op_state == `OP_INIT) begin
-            // one round is 128 clock cycle [6:0]
+            // one round is 128 clock cycle [6:0], but down counting
             // 6543210
-            // x000xxx - 0-7 / 64-71 noop
-            // 0xxxxxx - 8-63 black
-            // 1xxxxxx - 72-127 white
-            if (op_framecnt[5:3] == 3'b0)
+            // x111xxx - 0-7 / 64-71 noop
+            // 1xxxxxx - 8-63 black
+            // 0xxxxxx - 72-127 white
+            if (op_framecnt[5:3] == 3'b111)
                 proc_output = `NO_DRIVE;
-            else if (op_framecnt[6] == 1'b0)
+            else if (op_framecnt[6] == 1'b1)
                 proc_output = `DRIVE_BLACK;
             else
                 proc_output = `DRIVE_WHITE;
