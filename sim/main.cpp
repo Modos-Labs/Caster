@@ -128,6 +128,7 @@ void tick() {
 void reset() {
     core->rst = 1;
     tick();
+    tick();
     core->rst = 0;
     dispsim_reset();
     srcsim_reset();

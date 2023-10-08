@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <queue>
 #include "spisim.h"
 
 static const int SPI_DIV = 10;
@@ -35,10 +36,10 @@ static int mosi = 1;
 static int bit_counter = 0;
 static int byte_counter = 0;
 // Current transaction
-static int byte_count = 0;
-static uint8_t byte_buf[8192];
-
-uint8_t spi_get_next_bytes(uint8_t *buf);
+// There is no multithreading going on in the simulator, so lock is not needed.
+// 0x00-0xFF normal data
+// 0x100     break (pull CS high)
+static std::queue<uint16_t> byte_buf;
 
 void spisim_reset() {
     spi_divider = SPI_DIV;
@@ -57,18 +58,20 @@ void spisim_apply(uint8_t &spi_cs, uint8_t &spi_sck, uint8_t &spi_mosi,
             // negedge
             sck = 0;
             if (bit_counter == 0) {
-                cs = 0;
-                if (byte_counter == 0) {
-                    byte_count = spi_get_next_bytes(byte_buf);
-                }
-                spi_tx = byte_buf[byte_counter];
-                if (byte_counter == byte_count) {
+                if (byte_buf.empty()) {
+                    // Empty, stop
                     cs = 1;
-                    byte_counter = 0;
+                    spi_tx = 0xff;
+                }
+                else if (byte_buf.front() == 0x100) {
+                    // Requested packet break, stop
+                    cs = 1;
                     spi_tx = 0xff;
                 }
                 else {
-                    byte_counter ++;
+                    // Has data, start or continue
+                    spi_tx = byte_buf.front();
+                    byte_buf.pop();
                 }
             }
             mosi = (spi_tx >> 7) & 0x01;
@@ -86,17 +89,23 @@ void spisim_apply(uint8_t &spi_cs, uint8_t &spi_sck, uint8_t &spi_mosi,
     spi_mosi = mosi;
 }
 
-uint8_t spi_get_next_bytes(uint8_t *buf) {
-    static int seq = 0;
-    seq++;
-    if (seq == 1) {
-        // Try write something
-        byte_buf[0] = 0x01;
-        byte_buf[1] = 0x02;
-        byte_buf[2] = 0x34;
-        return 3;
+void spi_wrtte_reg8(uint8_t addr, uint8_t val) {
+    byte_buf.push(addr);
+    byte_buf.push(val);
+    byte_buf.push(0x100);
+}
+
+void spi_write_reg16(uint8_t addr, uint16_t val) {
+    byte_buf.push(addr);
+    byte_buf.push(val >> 8);
+    byte_buf.push(val & 0xff);
+    byte_buf.push(0x100);
+}
+
+void spi_write_bulk(uint8_t addr, uint8_t *buf, int length) {
+    byte_buf.push(addr);
+    for (int i = 0; i < length; i++) {
+        byte_buf.push(buf[i]);
     }
-    else {
-        return 0;
-    }
+    byte_buf.push(0x100);
 }
