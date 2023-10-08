@@ -64,8 +64,11 @@ module pixel_processing(
     // Bit 11-8: Reserved
     // Bit 7-4: Source pixel value
     // Bit 3-0: Target pixel value
-    // Auto LUT mode uses a global framecounter due to insufficient bits inside
-    // state buffer.
+    // Auto LUT mode uses a global framecounter to keep global synchronization,
+    // and insufficient space to keep counter in per pixel state.
+    // Just an idea, it's also possible to create a bounding box for all changed
+    // pixels and only update inside the bounding box. However ghosting may
+    // prove this to be a bad idea.
     // When frame counter is not 0, waveform lookup is in progress.
     // When lookup is in progress, the state is kept in still, until the last
     // frame where the dest value is copied to source value.
