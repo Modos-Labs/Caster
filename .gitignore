@@ -13,6 +13,7 @@ xilinxsim.ini
 
 # tools binary
 tools/bin2mif
+sim/sim
 
 *.map
 *.obj
