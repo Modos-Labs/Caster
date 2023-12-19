@@ -34,6 +34,7 @@
 #include "srcsim.h"
 #include "vramsim.h"
 #include "spisim.h"
+#include "intapi.h"
 
 #define SIM_STEP 100000
 //#define MAX_CYCLES 500000
@@ -53,7 +54,33 @@ Vcaster *core;
 VerilatedVcdC *trace;
 uint64_t tickcount;
 
-void tick() {
+void testmain(void) {
+    static int step = 0;
+    // This function is called every tick
+    switch (step) {
+    case 0:
+        spi_write_reg8(CSR_CFG_V_FP, 3);
+        spi_write_reg8(CSR_CFG_V_SYNC, 1);
+        spi_write_reg8(CSR_CFG_V_BP, 2);
+        spi_write_reg16(CSR_CFG_V_ACT, 120);
+        spi_write_reg8(CSR_CFG_H_FP, 2);
+        spi_write_reg8(CSR_CFG_H_SYNC, 1);
+        spi_write_reg8(CSR_CFG_H_BP, 2);
+        spi_write_reg16(CSR_CFG_H_ACT, 40);
+        spi_write_reg8(CSR_CONTROL, 1); // Enable refresh
+        step = 1;
+        break;
+    case 1:
+        if (!spi_is_busy()) {
+            printf("Initialization over SPI done.\n");
+            step = 2;
+        }
+        break;
+    // Do more test here
+    }
+}
+
+void tick(void) {
     // Create local copy of input signals
     uint8_t vin_vsync;
     uint32_t vin_pixel;
@@ -123,9 +150,11 @@ void tick() {
     trace->dump(tickcount * 10 + 5);
 #endif
     tickcount++;
+
+    testmain();
 }
 
-void reset() {
+void reset(void) {
     core->rst = 1;
     tick();
     tick();
@@ -137,7 +166,7 @@ void reset() {
     core->sys_ready = 1;
 }
 
-void render_copy() {
+void render_copy(void) {
     void *texture_pixel;
 	int texture_pitch;
 
@@ -220,7 +249,7 @@ int main(int argc, char *argv[]) {
         
         uint32_t ms_delta = SDL_GetTicks() - ms_tick;
         char title[50];
-        sprintf(title, "Caster Sim (%d kHz)", SIM_STEP / ms_delta);
+        snprintf(title, 50, "Caster Sim (%d kHz)", SIM_STEP / ms_delta);
         SDL_SetWindowTitle(window, title);
         ms_tick = SDL_GetTicks();
 

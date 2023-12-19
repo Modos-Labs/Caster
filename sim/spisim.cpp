@@ -65,11 +65,13 @@ void spisim_apply(uint8_t &spi_cs, uint8_t &spi_sck, uint8_t &spi_mosi,
                 }
                 else if (byte_buf.front() == 0x100) {
                     // Requested packet break, stop
+                    byte_buf.pop();
                     cs = 1;
                     spi_tx = 0xff;
                 }
                 else {
                     // Has data, start or continue
+                    cs = 0;
                     spi_tx = byte_buf.front();
                     byte_buf.pop();
                 }
@@ -89,7 +91,7 @@ void spisim_apply(uint8_t &spi_cs, uint8_t &spi_sck, uint8_t &spi_mosi,
     spi_mosi = mosi;
 }
 
-void spi_wrtte_reg8(uint8_t addr, uint8_t val) {
+void spi_write_reg8(uint8_t addr, uint8_t val) {
     byte_buf.push(addr);
     byte_buf.push(val);
     byte_buf.push(0x100);
@@ -108,4 +110,12 @@ void spi_write_bulk(uint8_t addr, uint8_t *buf, int length) {
         byte_buf.push(buf[i]);
     }
     byte_buf.push(0x100);
+}
+
+bool spi_is_busy(void) {
+    if (cs == 0)
+        return true;
+    if (byte_buf.size() > 0)
+        return true;
+    return false;
 }

@@ -27,7 +27,7 @@ module pixel_processing(
     input  wire        op_valid,    // External operation enable
     input  wire [7:0]  op_cmd,      // External operation command
     input  wire [7:0]  op_param,    // External operation parameter
-    input  wire [10:0] op_framecnt, // Current overall frame counter for state
+    input  wire [7:0]  op_framecnt, // Current overall frame counter for state
     input  wire [5:0]  al_framecnt, // Auto LUT mode frame counter
     output reg         al_diff      // Auto LUT mode input change detected
 );
@@ -43,8 +43,6 @@ module pixel_processing(
     localparam MODE_FAST_GREY = 4'd11; // 1011
     localparam MODE_AUTO_LUT_NO_DITHER = 4'd12; // 1100
     localparam MODE_AUTO_LUT_ERROR_DIFFUSION = 4'd13; // 1101
-    localparam MODE_RESERVED1 = 4'd14; // 1100
-    localparam MODE_RESERVED2 = 4'd15; // 1101
 
     //localparam FASTM_B2W_FRAMES = 6'd9;
     //localparam FASTM_W2B_FRAMES = 6'd9;
@@ -377,6 +375,11 @@ module pixel_processing(
                 proc_bo = {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0};
             `SETMODE_AUTO_LUT_ERROR_DIFFUSION:
                 proc_bo = {MODE_AUTO_LUT_ERROR_DIFFUSION, 4'd0, 4'd15, 4'd0};
+            default: begin
+                // Invalid input detected, default back to manual lut
+                proc_bo = {MODE_MANUAL_LUT_NO_DITHER, 4'd0, 6'd0, 4'd15};
+                $display("Invalid set mode");
+            end
             endcase
         end
 

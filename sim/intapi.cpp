@@ -32,67 +32,48 @@ static size_t last_update;
 static size_t last_update_duration;
 static uint8_t waveform_frames;
 
-static size_t intapi_get_time_ms() {
-
+static uint8_t get_update_frames(void) {
+    // Should be worst case time to clear/ update a frame
+    //uint8_t min_time = 10; // Minimum time for non-LUT modes
+    // actually, just always return 1s
+    return 60;
 }
 
-static void intapi_delay_ms(size_t ms) {
-
-}
-
-static void intapi_wait() {
-    size_t time_diff = intapi_get_time_ms() - last_update;
-    if (time_diff < last_update_duration) {
-        size_t time_to_wait = last_update_duration - time_diff;
-        intapi_delay_ms(time_to_wait);
-    }
-}
-
-static uint8_t intapi_get_mode_update_frames(UPDATE_MODE mode) {
-    switch (mode) {
-    case UM_MANUAL_LUT_NO_DITHER:
-    case UM_MANUAL_LUT_ERROR_DIFFUSION:
-    case UM_AUTO_LUT_NO_DITHER:
-    case UM_AUTO_LUT_ERROR_DIFFUSION:
-        return waveform_frames;
-    case UM_FAST_MONO_NO_DITHER:
-    case UM_FAST_MONO_ORDERED:
-    case UM_FAST_MONO_ERROR_DIFFUSION:
-        return;
-    case UM_FAST_GREY:
-        return;
-    default:
-        assert(0);
-        return 0;
-    }
+static void wait(void) {
+    // Reading is not implemented in the simulator
 }
 
 void intapi_init(void) {
     current_mode = UM_AUTO_LUT_NO_DITHER; // Need to sync with the RTL code
-    last_update = intapi_get_time_ms();
-    last_update_duration = 0;
     waveform_frames = 38; // Need to sync with the RTL code
 }
 
-void intapi_load_waveform(uint8_t *wvfm, uint8_t frames) {
-    intapi_wait();
-    spi_wrtte_reg8(CSR_LUTFRAME, 0); // Reset value before loading
-    spi_write_reg16(CSR_LUTADDR, 0);
-    spi_write_bulk(CSR_LUTWR, wvfm, WVFM_SIZE);
+void intapi_load_waveform(uint8_t *waveform, uint8_t frames) {
+    wait();
+    spi_write_reg8(CSR_LUT_FRAME, 0); // Reset value before loading
+    spi_write_reg16(CSR_LUT_ADDR, 0);
+    spi_write_bulk(CSR_LUT_WR, waveform, WAVEFORM_SIZE);
     waveform_frames = frames;
 }
 
 void intapi_redraw(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
-    intapi_wait();
-    spi_write_reg16(CSR_OPLEFT, x0);
-    spi_write_reg16(CSR_OPTOP, y0);
-    spi_write_reg16(CSR_OPRIGHT, x1);
-    spi_write_reg16(CSR_OPBOTTOM, y1);
-    spi_write_reg8();
+    wait();
+    spi_write_reg16(CSR_OP_LEFT, x0);
+    spi_write_reg16(CSR_OP_TOP, y0);
+    spi_write_reg16(CSR_OP_RIGHT, x1);
+    spi_write_reg16(CSR_OP_BOTTOM, y1);
+    spi_write_reg8(CSR_OP_LENGTH, get_update_frames());
+    spi_write_reg8(CSR_OP_CMD, OP_EXT_REDRAW);
 }
 
 void intapi_setmode(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
         UPDATE_MODE mode) {
-    intapi_wait();
-    // 
+    wait();
+    spi_write_reg16(CSR_OP_LEFT, x0);
+    spi_write_reg16(CSR_OP_TOP, y0);
+    spi_write_reg16(CSR_OP_RIGHT, x1);
+    spi_write_reg16(CSR_OP_BOTTOM, y1);
+    spi_write_reg8(CSR_OP_LENGTH, get_update_frames());
+    spi_write_reg8(CSR_OP_PARAM, (uint8_t)mode);
+    spi_write_reg8(CSR_OP_CMD, OP_EXT_REDRAW);
 }

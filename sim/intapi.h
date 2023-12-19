@@ -23,30 +23,59 @@
 #pragma once
 
 // Register map
-#define CSR_LUTFRAME        0
-#define CSR_LUTADDR_HI      1
-#define CSR_LUTADDR_LO      2
-#define CSR_LUTWR           3
-#define CSR_OPLEFT_HI       4
-#define CSR_OPLEFT_LO       5
-#define CSR_OPRIGHT_HI      6
-#define CSR_OPRIGHT_LO      7
-#define CSR_OPTOP_HI        8
-#define CSR_OPTOP_LO        9
-#define CSR_OPBOTTOM_HI     10
-#define CSR_OPBOTTOM_LO     11
-#define CSR_OPPARAM         12
-#define CSR_OPCMD           13
+#define CSR_LUT_FRAME       0
+#define CSR_LUT_ADDR_HI     1
+#define CSR_LUT_ADDR_LO     2
+#define CSR_LUT_WR          3
+#define CSR_OP_LEFT_HI      4
+#define CSR_OP_LEFT_LO      5
+#define CSR_OP_RIGHT_HI     6
+#define CSR_OP_RIGHT_LO     7
+#define CSR_OP_TOP_HI       8
+#define CSR_OP_TOP_LO       9
+#define CSR_OP_BOTTOM_HI    10
+#define CSR_OP_BOTTOM_LO    11
+#define CSR_OP_PARAM        12
+#define CSR_OP_LENGTH       13
+#define CSR_OP_CMD          14
+#define CSR_CONTROL         15
+#define CSR_CFG_V_FP        16
+#define CSR_CFG_V_SYNC      17
+#define CSR_CFG_V_BP        18
+#define CSR_CFG_V_ACT_HI    19
+#define CSR_CFG_V_ACT_LO    20
+#define CSR_CFG_H_FP        21
+#define CSR_CFG_H_SYNC      22
+#define CSR_CFG_H_BP        23
+#define CSR_CFG_H_ACT_HI    24
+#define CSR_CFG_H_ACT_LO    25
+#define CSR_CFG_FBYTES_B2   27
+#define CSR_CFG_FBYTES_B1   28
+#define CSR_CFG_FBYTES_B0   29
 // Alias for 16bit registers
-#define CSR_LUTADDR     CSR_LUTADDR_HI
-#define CSR_OPLEFT      CSR_OPLEFT_HI
-#define CSR_OPRIGHT     CSR_OPRIGHT_HI
-#define CSR_OPTOP       CSR_OPTOP_HI
-#define CSR_OPBOTTOM    CSR_OPBOTTOM_HI
+#define CSR_LUT_ADDR        CSR_LUT_ADDR_HI
+#define CSR_OP_LEFT         CSR_OP_LEFT_HI
+#define CSR_OP_RIGHT        CSR_OP_RIGHT_HI
+#define CSR_OP_TOP          CSR_OP_TOP_HI
+#define CSR_OP_BOTTOM       CSR_OP_BOTTOM_HI
+#define CSR_CFG_V_ACT       CSR_CFG_V_ACT_HI
+#define CSR_CFG_H_ACT       CSR_CFG_H_ACT_HI
 
-#define WVFM_SIZE       (4*1024)
+// Commands
+#define OP_EXT_REDRAW       0
+#define OP_EXT_SETMODE      1
 
-#define FRAME_RATE_HZ   (60)
+// Status bits
+#define STATUS_MIG_ERROR    7
+#define STATUS_MIF_ERROR    6
+#define STATUS_SYS_READY    5
+#define STATUS_OP_BUSY      4
+#define STATUS_OP_QUEUE     3
+#define CTRL_ENABLE         0
+
+#define WAVEFORM_SIZE       (4*1024)
+
+#define FRAME_RATE_HZ       (60)
 
 typedef enum {
     UM_MANUAL_LUT_NO_DITHER = 0,
@@ -60,7 +89,7 @@ typedef enum {
 } UPDATE_MODE;
 
 void intapi_init(void);
-void intapi_load_waveform(uint8_t *wvfm, uint8_t frames);
+void intapi_load_waveform(uint8_t *waveform, uint8_t frames);
 void intapi_redraw(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
 void intapi_setmode(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
         UPDATE_MODE mode);

@@ -12,6 +12,7 @@
 // Control/ status register over SPI
 `default_nettype none
 `timescale 1ns / 1ps
+`include "defines.vh"
 module csr(
     input wire clk,
     input wire rst,
@@ -30,8 +31,25 @@ module csr(
     output reg [11:0] csr_optop,
     output reg [11:0] csr_opbottom,
     output reg [7:0] csr_opparam,
+    output reg [7:0] csr_oplength,
     output reg [7:0] csr_opcmd,
-    output reg csr_ope
+    output reg csr_ope,
+    output reg [7:0] csr_cfg_vfp,
+    output reg [7:0] csr_cfg_vsync,
+    output reg [7:0] csr_cfg_vbp,
+    output reg [11:0] csr_cfg_vact,
+    output reg [7:0] csr_cfg_hfp,
+    output reg [7:0] csr_cfg_hsync,
+    output reg [7:0] csr_cfg_hbp,
+    output reg [11:0] csr_cfg_hact,
+    output reg [23:0] csr_cfg_fbytes,
+    output reg csr_ctrl_en,
+    // Status input
+    input wire sys_ready,
+    input wire mig_error,
+    input wire mif_error,
+    input wire op_busy,
+    input wire op_queue
     );
 
     // Uses SPI mode 3: clock high on idle,
@@ -42,7 +60,7 @@ module csr(
     // Byte 1+: data
 
     reg last_sck;
-    reg [1:0] spi_state;
+    reg [0:0] spi_state;
     reg [2:0] bit_counter;
     reg [6:0] spi_rx;
     reg [7:0] spi_tx;
@@ -56,24 +74,8 @@ module csr(
     reg [7:0] spi_req_wdata;
     wire spi_autoinc;
 
-    localparam SPI_IDLE = 2'd0;
-    localparam SPI_ADDR_PHASE = 2'd1;
-    localparam SPI_DATA_PHASE = 2'd2;
-
-    localparam CSR_LUTFRAME = 8'd0;
-    localparam CSR_LUTADDR_HI = 8'd1;
-    localparam CSR_LUTADDR_LO = 8'd2;
-    localparam CSR_LUTWR = 8'd3;
-    localparam CSR_OPLEFT_HI = 8'd4;
-    localparam CSR_OPLEFT_LO = 8'd5;
-    localparam CSR_OPRIGHT_HI = 8'd6;
-    localparam CSR_OPRIGHT_LO = 8'd7;
-    localparam CSR_OPTOP_HI = 8'd8;
-    localparam CSR_OPTOP_LO = 8'd9;
-    localparam CSR_OPBOTTOM_HI = 8'd10;
-    localparam CSR_OPBOTTOM_LO = 8'd11;
-    localparam CSR_OPPARAM = 8'd12;
-    localparam CSR_OPCMD = 8'd13;
+    localparam SPI_ADDR_PHASE = 1'd0;
+    localparam SPI_DATA_PHASE = 1'd1;
 
     always @(posedge clk) begin
         last_sck <= spi_sck;
@@ -120,36 +122,59 @@ module csr(
             last_sck <= 1'b0;
             spi_req_ren <= 1'b0;
             spi_req_wen <= 1'b0;
-            spi_state <= SPI_IDLE;
+            spi_state <= SPI_ADDR_PHASE;
         end
     end
 
-    assign spi_req_rdata = 8'h00; // Nothing to be read out yet
+    assign spi_req_rdata =
+        (spi_req_addr == `CSR_CONTROL) ?
+            {mig_error, mif_error, sys_ready, op_busy, op_queue, 2'd0, csr_ctrl_en} :
+        8'd0;
 
     always @(posedge clk) begin
         csr_lutwe <= 1'b0;
         csr_ope <= 1'b0;
         if (spi_req_wen) begin
             case (spi_req_addr)
-            CSR_LUTFRAME: csr_lutframe <= spi_req_wdata[5:0];
-            CSR_LUTADDR_HI: csr_lutaddr[11:8] <= spi_req_wdata[3:0];
-            CSR_LUTADDR_LO: csr_lutaddr[7:0] <= spi_req_wdata;
-            CSR_LUTWR: begin
+            `CSR_LUT_FRAME: csr_lutframe <= spi_req_wdata[5:0];
+            `CSR_LUT_ADDR_HI: csr_lutaddr[11:8] <= spi_req_wdata[3:0];
+            `CSR_LUT_ADDR_LO: csr_lutaddr[7:0] <= spi_req_wdata;
+            `CSR_LUT_WR: begin
                 csr_lutwr <= spi_req_wdata;
                 csr_lutwe <= 1'b1;
             end
-            CSR_OPLEFT_HI: csr_opleft[11:8] <= spi_req_wdata[3:0];
-            CSR_OPLEFT_LO: csr_opleft[7:0] <= spi_req_wdata;
-            CSR_OPRIGHT_HI: csr_opright[11:8] <= spi_req_wdata[3:0];
-            CSR_OPRIGHT_LO: csr_opright[7:0] <= spi_req_wdata;
-            CSR_OPTOP_HI: csr_optop[11:8] <= spi_req_wdata[3:0];
-            CSR_OPTOP_LO: csr_optop[7:0] <= spi_req_wdata;
-            CSR_OPBOTTOM_HI: csr_opbottom[11:8] <= spi_req_wdata[3:0];
-            CSR_OPBOTTOM_LO: csr_opbottom[7:0] <= spi_req_wdata;
-            CSR_OPPARAM: csr_opparam <= spi_req_wdata;
-            CSR_OPCMD: begin
+            `CSR_OP_LEFT_HI: csr_opleft[11:8] <= spi_req_wdata[3:0];
+            `CSR_OP_LEFT_LO: csr_opleft[7:0] <= spi_req_wdata;
+            `CSR_OP_RIGHT_HI: csr_opright[11:8] <= spi_req_wdata[3:0];
+            `CSR_OP_RIGHT_LO: csr_opright[7:0] <= spi_req_wdata;
+            `CSR_OP_TOP_HI: csr_optop[11:8] <= spi_req_wdata[3:0];
+            `CSR_OP_TOP_LO: csr_optop[7:0] <= spi_req_wdata;
+            `CSR_OP_BOTTOM_HI: csr_opbottom[11:8] <= spi_req_wdata[3:0];
+            `CSR_OP_BOTTOM_LO: csr_opbottom[7:0] <= spi_req_wdata;
+            `CSR_OP_PARAM: csr_opparam <= spi_req_wdata;
+            `CSR_OP_LENGTH: csr_oplength <= spi_req_wdata;
+            `CSR_OP_CMD: begin
                 csr_opcmd <= spi_req_wdata;
                 csr_ope <= 1'b1;
+            end
+            `CSR_CONTROL: begin
+                csr_ctrl_en <= 1'b1;
+            end
+            `CSR_CFG_V_FP: csr_cfg_vfp <= spi_req_wdata;
+            `CSR_CFG_V_SYNC: csr_cfg_vsync <= spi_req_wdata;
+            `CSR_CFG_V_BP: csr_cfg_vbp <= spi_req_wdata;
+            `CSR_CFG_V_ACT_HI: csr_cfg_vact[11:8] <= spi_req_wdata[3:0];
+            `CSR_CFG_V_ACT_LO: csr_cfg_vact[7:0] <= spi_req_wdata;
+            `CSR_CFG_H_FP: csr_cfg_hfp <= spi_req_wdata;
+            `CSR_CFG_H_SYNC: csr_cfg_hsync <= spi_req_wdata;
+            `CSR_CFG_H_BP: csr_cfg_hbp <= spi_req_wdata;
+            `CSR_CFG_H_ACT_HI: csr_cfg_hact[11:8] <= spi_req_wdata[3:0];
+            `CSR_CFG_H_ACT_LO: csr_cfg_hact[7:0] <= spi_req_wdata;
+            `CSR_CFG_FBYTES_B2: csr_cfg_fbytes[23:16] <= spi_req_wdata;
+            `CSR_CFG_FBYTES_B1: csr_cfg_fbytes[15:8] <= spi_req_wdata;
+            `CSR_CFG_FBYTES_B0: csr_cfg_fbytes[7:0] <= spi_req_wdata;
+            default: begin
+                // no op
             end
             endcase
         end
@@ -157,10 +182,11 @@ module csr(
             csr_lutframe <= 6'd38; // Needs to match default waveform
             csr_lutwe <= 1'b0;
             csr_ope <= 1'b0;
+            csr_ctrl_en <= 1'b0;
         end
     end
 
-    assign spi_autoinc = (spi_req_addr != CSR_LUTWR) && (spi_req_addr != CSR_OPCMD);
+    assign spi_autoinc = (spi_req_addr != `CSR_LUT_WR) && (spi_req_addr != `CSR_OP_CMD);
 
 endmodule
 `default_nettype wire

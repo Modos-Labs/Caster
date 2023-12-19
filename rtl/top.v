@@ -220,27 +220,35 @@ module top(
         .clko(clk_epdc),
         .o(vin_vsync)
     );
-    
-    // VRAM interface
-    wire         clk_mif;
-    wire         memif_trigger;
-    wire         pix_read_valid;
-    wire         pix_read_ready;
-    wire [127:0] pix_read;
-    wire         pix_write_valid;
-    wire         pix_write_ready;
-    wire [127:0] pix_write;
-    wire         ddr_calib_done;
-    
-    wire memif_error;
-    wire memif_data_valid;
 
-    memif #(
+    // Hardware DDR controller
+    wire clk_mif;
+    wire ddr_calib_done;
+    wire mig_cmd_en;
+    wire [2:0] mig_cmd_instr;
+    wire [5:0] mig_cmd_bl;
+    wire [29:0] mig_cmd_byte_addr;
+    wire mig_cmd_empty;
+    wire mig_cmd_full;
+    wire mig_wr_en;
+    wire [15:0] mig_wr_mask;
+    wire [127:0] mig_wr_data;
+    wire mig_wr_empty;
+    wire mig_wr_full;
+    wire [6:0] mig_wr_count;
+    wire mig_wr_underrun;
+    wire mig_rd_en;
+    wire [127:0] mig_rd_data;
+    wire mig_rd_full;
+    wire mig_rd_empty;
+    wire mig_rd_overflow;
+    wire [6:0] mig_rd_count;
+    wire mig_error;
+
+    mig_wrapper #(
         .SIMULATION(SIMULATION),
-        .CALIB_SOFT_IP(CALIB_SOFT_IP),
-        .MAX_ADDRESS(EPDC_H_ACT * 4 * EPDC_V_ACT * 2)
-    )
-    memif(
+        .CALIB_SOFT_IP(CALIB_SOFT_IP)
+    ) mig_wrapper(
         // Clock and reset
         .clk_sys(clk_ddr),
         .clk_mif(clk_mif),
@@ -268,6 +276,50 @@ module top(
         .ddr_zio(DDR_ZIO),
         // Control interface
         .ddr_calib_done(ddr_calib_done),
+        // User interface
+        .mig_cmd_en(mig_cmd_en),
+        .mig_cmd_instr(mig_cmd_instr),
+        .mig_cmd_bl(mig_cmd_bl),
+        .mig_cmd_byte_addr(mig_cmd_byte_addr),
+        .mig_cmd_empty(mig_cmd_empty),
+        .mig_cmd_full(mig_cmd_full),
+        .mig_wr_en(mig_wr_en),
+        .mig_wr_mask(mig_wr_mask),
+        .mig_wr_data(mig_wr_data),
+        .mig_wr_empty(mig_wr_empty),
+        .mig_wr_full(mig_wr_full),
+        .mig_wr_count(mig_wr_count),
+        .mig_wr_underrun(mig_wr_underrun),
+        .mig_rd_en(mig_rd_en),
+        .mig_rd_data(mig_rd_data),
+        .mig_rd_full(mig_rd_full),
+        .mig_rd_empty(mig_rd_empty),
+        .mig_rd_overflow(mig_rd_overflow),
+        .mig_rd_count(mig_rd_count),
+        // Error
+        .error(mig_error)
+    );
+
+    // VRAM interface
+    wire memif_trigger;
+    wire pix_read_valid;
+    wire pix_read_ready;
+    wire [127:0] pix_read;
+    wire pix_write_valid;
+    wire pix_write_ready;
+    wire [127:0] pix_write;
+    
+    wire memif_error;
+
+    memif #(
+        .MAX_ADDRESS(EPDC_H_ACT * 4 * EPDC_V_ACT * 2)
+    )
+    memif(
+        // Clock and reset
+        .clk(clk_mif),
+        .rst(sys_rst),
+        // Sync
+        .enable(!ddr_calib_done),
         .vsync(memif_trigger),
         // Pixel output interface
         .pix_read(pix_read),
@@ -277,8 +329,28 @@ module top(
         .pix_write(pix_write),
         .pix_write_valid(pix_write_valid),
         .pix_write_ready(pix_write_ready),
-        .error(memif_error),
-        .cmp_data_valid(memif_data_valid)
+        // To MIG
+        .mig_cmd_en(mig_cmd_en),
+        .mig_cmd_instr(mig_cmd_instr),
+        .mig_cmd_bl(mig_cmd_bl),
+        .mig_cmd_byte_addr(mig_cmd_byte_addr),
+        .mig_cmd_empty(mig_cmd_empty),
+        .mig_cmd_full(mig_cmd_full),
+        .mig_wr_en(mig_wr_en),
+        .mig_wr_mask(mig_wr_mask),
+        .mig_wr_data(mig_wr_data),
+        .mig_wr_empty(mig_wr_empty),
+        .mig_wr_full(mig_wr_full),
+        .mig_wr_count(mig_wr_count),
+        .mig_wr_underrun(mig_wr_underrun),
+        .mig_rd_en(mig_rd_en),
+        .mig_rd_data(mig_rd_data),
+        .mig_rd_full(mig_rd_full),
+        .mig_rd_empty(mig_rd_empty),
+        .mig_rd_overflow(mig_rd_overflow),
+        .mig_rd_count(mig_rd_count),
+        // Error
+        .error(memif_error)
     );
 
     dff_sync memif_vs_sync (
@@ -437,7 +509,7 @@ module top(
         })
     );
     
-    assign EPD_SD[15:8] = EPD_SD[7:0]
+    assign EPD_SD[15:8] = EPD_SD[7:0];
 
 endmodule
 `default_nettype wire

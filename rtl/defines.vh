@@ -2,6 +2,37 @@
 `define OP_INIT             2'd0 // Initial power up
 `define OP_NORMAL           2'd1 // Normal operation
 
+// CSR map
+`define CSR_LUT_FRAME       8'd0
+`define CSR_LUT_ADDR_HI     8'd1
+`define CSR_LUT_ADDR_LO     8'd2
+`define CSR_LUT_WR          8'd3
+`define CSR_OP_LEFT_HI      8'd4
+`define CSR_OP_LEFT_LO      8'd5
+`define CSR_OP_RIGHT_HI     8'd6
+`define CSR_OP_RIGHT_LO     8'd7
+`define CSR_OP_TOP_HI       8'd8
+`define CSR_OP_TOP_LO       8'd9
+`define CSR_OP_BOTTOM_HI    8'd10
+`define CSR_OP_BOTTOM_LO    8'd11
+`define CSR_OP_PARAM        8'd12
+`define CSR_OP_LENGTH       8'd13
+`define CSR_OP_CMD          8'd14
+`define CSR_CONTROL         8'd15
+`define CSR_CFG_V_FP        8'd16
+`define CSR_CFG_V_SYNC      8'd17
+`define CSR_CFG_V_BP        8'd18
+`define CSR_CFG_V_ACT_HI    8'd19
+`define CSR_CFG_V_ACT_LO    8'd20
+`define CSR_CFG_H_FP        8'd21
+`define CSR_CFG_H_SYNC      8'd22
+`define CSR_CFG_H_BP        8'd23
+`define CSR_CFG_H_ACT_HI    8'd24
+`define CSR_CFG_H_ACT_LO    8'd25
+`define CSR_CFG_FBYTES_B2   8'd27
+`define CSR_CFG_FBYTES_B1   8'd28
+`define CSR_CFG_FBYTES_B0   8'd29
+
 // FB operations
 // Redraw:
 // In fast bw/ gray mode, the display input is forced to be black/ white

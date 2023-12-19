@@ -16,7 +16,6 @@
 module caster(
     input  wire         clk, // 4X/8X output clock rate
     input  wire         rst,
-    input  wire         sys_ready, // Power OK, DDR calibration done, etc.
     // New image Input, 4 pix per clock, Y8 input
     // This input is buffered after a ASYNC FIFO
     input  wire         vin_vsync,
@@ -42,28 +41,22 @@ module caster(
     output wire         epd_sdoe,
     output wire [7:0]   epd_sd,
     output wire         epd_sdce0,
-    // CSR interface
+    // CSR SPI interface
     input  wire         spi_cs,
     input  wire         spi_sck,
     input  wire         spi_mosi,
-    output wire         spi_miso
+    output wire         spi_miso,
+    // Control / Status
+    input  wire         sys_ready, // Power OK, DDR calibration done, etc.
+    input  wire         mig_error,
+    input  wire         mif_error,
+    output wire [23:0]  frame_bytes,
+    output wire         global_en
     );
 
     parameter COLORMODE = "MONO";
 
     // Screen timing
-    // Timing starts when VS is detected
-    parameter V_FP = 3; // Lines before sync with SDOE / GDOE low, GDSP high (inactive)
-    parameter V_SYNC = 1; // Lines at sync with SDOE / GDOE high, GDSP low (active)
-    parameter V_BP = 2; // Lines before data becomes active
-    parameter V_ACT = 120;
-    localparam V_TOTAL = V_FP + V_SYNC + V_BP + V_ACT;
-    parameter H_FP = 2; // SDLE low (inactive), SDCE0 high (inactive), clock active
-    parameter H_SYNC = 1; // SDLE high (active), SDCE0 high (inactive), GDCLK lags by 1 clock, clock active
-    parameter H_BP = 2; // SDLE low (inactive), SDCE0 high (inactive), no clock
-    parameter H_ACT = 40; // Active pixels / 4, SDCE0 low (active)
-    localparam H_TOTAL = H_FP + H_SYNC + H_BP + H_ACT;
-
     parameter SIMULATION = "TRUE";
 
     // Output logic
@@ -71,7 +64,7 @@ module caster(
     localparam SCAN_WAITING = 2'd1;
     localparam SCAN_RUNNING = 2'd2;
 
-    localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 256 : 2;
+    localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 255 : 2;
 
     // Internal design specific
     localparam VS_DELAY = 8; // wait 8 clocks after VS is vaild
@@ -87,8 +80,17 @@ module caster(
     wire [11:0] csr_optop;
     wire [11:0] csr_opbottom;
     wire [7:0] csr_opparam;
+    wire [7:0] csr_oplength;
     wire [7:0] csr_opcmd;
     wire csr_ope;
+    wire [7:0] vfp;
+    wire [7:0] vsync;
+    wire [7:0] vbp;
+    wire [11:0] vact;
+    wire [7:0] hfp;
+    wire [7:0] hsync;
+    wire [7:0] hbp;
+    wire [11:0] hact;
     csr csr (
         .clk(clk),
         .rst(rst),
@@ -105,9 +107,31 @@ module caster(
         .csr_optop(csr_optop),
         .csr_opbottom(csr_opbottom),
         .csr_opparam(csr_opparam),
+        .csr_oplength(csr_oplength),
         .csr_opcmd(csr_opcmd),
-        .csr_ope(csr_ope)
+        .csr_ope(csr_ope),
+        .csr_cfg_vfp(vfp),
+        .csr_cfg_vsync(vsync),
+        .csr_cfg_vbp(vbp),
+        .csr_cfg_vact(vact),
+        .csr_cfg_hfp(hfp),
+        .csr_cfg_hsync(hsync),
+        .csr_cfg_hbp(hbp),
+        .csr_cfg_hact(hact),
+        .csr_cfg_fbytes(frame_bytes),
+        .csr_ctrl_en(global_en),
+        // Status input
+        .sys_ready(sys_ready),
+        .mig_error(mig_error),
+        .mif_error(mif_error),
+        .op_busy(op_valid),
+        .op_queue(op_pending)
     );
+
+    /* verilator lint_off width */
+    wire [10:0] vtotal = vfp + vsync + vbp + vact;
+    wire [10:0] htotal = hfp + hsync + hbp + hact;
+    /* verilator lint_on width */
 
     // frame operation are latched at vsync
     reg trigger_last;
@@ -165,8 +189,9 @@ module caster(
 
     reg [1:0] scan_state;
     reg [1:0] op_state;
+    reg frame_valid; // Global kill signal to mask off frame output
 
-    reg [10:0] op_framecnt; // Framecount for operation transition
+    reg [7:0] op_framecnt; // Framecount for operation transition
     assign op_done = op_framecnt == 0;
 
     // Counters for auto LUT mode
@@ -177,7 +202,7 @@ module caster(
     always @(posedge clk) begin
         case (scan_state)
         SCAN_IDLE: begin
-            if ((sys_ready) && (vin_vsync)) begin
+            if (sys_ready && global_en && vin_vsync) begin
                 scan_state <= SCAN_WAITING;
             end
             scan_h_cnt <= 0;
@@ -186,6 +211,7 @@ module caster(
         SCAN_WAITING: begin
             if (scan_h_cnt == VS_DELAY) begin
                 scan_state <= SCAN_RUNNING;
+                frame_valid <= 1'b1;
                 scan_h_cnt <= 0;
                 // Set frame count limit here
                 if (op_framecnt == 0) begin
@@ -193,10 +219,7 @@ module caster(
                         op_state <= `OP_NORMAL;
                     end
                     else if (op_valid) begin
-                        case (op_cmd)
-                        `OP_EXT_REDRAW: op_framecnt <= {3'd0, op_param};
-                        `OP_EXT_SETMODE: op_framecnt <= {3'd0, op_param};
-                        endcase
+                        op_framecnt <= csr_oplength;
                     end
                 end
                 else begin
@@ -218,8 +241,8 @@ module caster(
             end
         end
         SCAN_RUNNING: begin
-            if (scan_h_cnt == H_TOTAL - 1) begin
-                if (scan_v_cnt == V_TOTAL - 1) begin
+            if (scan_h_cnt == htotal - 1) begin
+                if (scan_v_cnt == vtotal - 1) begin
                     scan_state <= SCAN_IDLE;
                 end
                 else begin
@@ -233,6 +256,15 @@ module caster(
             // Update auto LUT state
             if (al_diff)
                 al_diff_reg <= 1'b1;
+            // Kill frame output if fifo underrun is detected
+            if ((vin_ready && !vin_valid) && (bi_ready && !bi_valid)) begin
+                frame_valid <= 1'b0;
+            end
+        end
+        default: begin
+            // Invalid state
+            $display("Scan FSM in invalid state");
+            scan_state <= SCAN_IDLE;
         end
         endcase
 
@@ -247,27 +279,27 @@ module caster(
         end
     end
 
-    // wire scan_in_vfp = (scan_state != SCAN_IDLE) ? (
-    //     (scan_v_cnt < V_FP)) : 1'b0;
+    /* verilator lint_off width */
     wire scan_in_vsync = (scan_state != SCAN_IDLE) ? (
-        (scan_v_cnt >= V_FP) && 
-        (scan_v_cnt < (V_FP + V_SYNC))) : 1'b0;
+        (scan_v_cnt >= vfp) && 
+        (scan_v_cnt < (vfp + vsync))) : 1'b0;
     wire scan_in_vbp = (scan_state != SCAN_IDLE) ? (
-        (scan_v_cnt >= (V_FP + V_SYNC)) &&
-        (scan_v_cnt < (V_FP + V_SYNC + V_BP))) : 1'b0;
+        (scan_v_cnt >= (vfp + vsync)) &&
+        (scan_v_cnt < (vfp + vsync + vbp))) : 1'b0;
     wire scan_in_vact = (scan_state != SCAN_IDLE) ? (
-        (scan_v_cnt >= (V_FP + V_SYNC + V_BP))) : 1'b0;
+        (scan_v_cnt >= (vfp + vsync + vbp))) : 1'b0;
 
     wire scan_in_hfp = (scan_state != SCAN_IDLE) ? (
-        (scan_h_cnt < H_FP)) : 1'b0;
+        (scan_h_cnt < hfp)) : 1'b0;
     wire scan_in_hsync = (scan_state != SCAN_IDLE) ? (
-        (scan_h_cnt >= H_FP) &&
-        (scan_h_cnt < (H_FP + H_SYNC))) : 1'b0;
+        (scan_h_cnt >= hfp) &&
+        (scan_h_cnt < (hfp + hsync))) : 1'b0;
     wire scan_in_hbp = (scan_state != SCAN_IDLE) ? (
-        (scan_h_cnt >= (H_FP + H_SYNC)) &&
-        (scan_h_cnt < (H_FP + H_SYNC + H_BP))) : 1'b0;
+        (scan_h_cnt >= (hfp + hsync)) &&
+        (scan_h_cnt < (hfp + hsync + hbp))) : 1'b0;
     wire scan_in_hact = (scan_state != SCAN_IDLE) ? (
-        (scan_h_cnt >= (H_FP + H_SYNC + H_BP))) : 1'b0;
+        (scan_h_cnt >= (hfp + hsync + hbp))) : 1'b0;
+    /* verilator lint_on width */
 
     wire scan_in_act = scan_in_vact && scan_in_hact;
 
@@ -279,16 +311,20 @@ module caster(
     // Stage 5: Writeback
 
     // STAGE 1
+    /* verilator lint_off width */
     wire s1_hactive = (scan_state != SCAN_IDLE) ? (
-        (scan_h_cnt >= (H_FP + H_SYNC + H_BP - PIPELINE_DELAY)) &&
-        (scan_h_cnt < (H_TOTAL - PIPELINE_DELAY))) : 1'b0;
+        (scan_h_cnt >= (hfp + hsync + hbp - PIPELINE_DELAY)) &&
+        (scan_h_cnt < (htotal - PIPELINE_DELAY))) : 1'b0;
+    /* verilator lint_on width */
     wire s1_active = scan_in_vact && s1_hactive;
     // Essentially a scan_in_act but few cycles eariler.
     assign vin_ready = s1_active;
     assign bi_ready = s1_active;
 
-    wire [10:0] h_cnt_offset = scan_h_cnt - (H_FP + H_SYNC + H_BP - PIPELINE_DELAY);
-    wire [10:0] v_cnt_offset = scan_v_cnt - (V_FP + V_SYNC + V_BP);
+    /* verilator lint_off width */
+    wire [10:0] h_cnt_offset = scan_h_cnt - (hfp + hsync + hbp - PIPELINE_DELAY);
+    wire [10:0] v_cnt_offset = scan_v_cnt - (vfp + vsync + vbp);
+    /* verilator lint_on width */
     wire [3:0] s1_op_valid;
     generate
         for (i = 0; i < 4; i = i + 1) begin: op_valid_assign
@@ -326,8 +362,8 @@ module caster(
             end
             else begin
                 if (scan_state == SCAN_RUNNING) begin
-                    if (scan_h_cnt == H_TOTAL - 1) begin
-                        if (scan_v_cnt == V_TOTAL - 1) begin
+                    if (scan_h_cnt == htotal - 1) begin
+                        if (scan_v_cnt == vtotal - 1) begin
                             v_cnt_mod_6 <= 0;
                         end
                         else begin
@@ -343,7 +379,7 @@ module caster(
         assign x_pos = {1'b0, h_cnt_mod_3};
         assign y_pos = v_cnt_mod_6;
     end
-    else if (COLORMODE == "MONO") begin
+    else if (COLORMODE == "MONO") begin: mono_counter
         assign x_pos = scan_h_cnt[2:0];
         assign y_pos = scan_v_cnt[2:0];
     end
@@ -397,8 +433,9 @@ module caster(
             // Only used for LUT modes.
             // Local counter (per pixel counter) is used for manual LUT modes
             // Global counter is used for auto LUT modes
-            wire [3:0] wvfm_vin = s2_vin_pixel[i*4 +: 4];
+            /*verilator lint_off UNUSEDSIGNAL */
             wire [15:0] wvfm_bi = s2_bi_pixel[i*16 +: 16];
+            /*verilator lint_on UNUSEDSIGNAL */
             wire use_local_counter =  wvfm_bi[15];
             wire [5:0] wvfm_fcnt_global_counter = wvfm_bi[9:4];
             wire [5:0] wvfm_fcnt_local_counter = al_framecnt;
@@ -493,8 +530,8 @@ module caster(
             );
 
             // Output
-            assign pixel_comb[i*2+1 : i*2] = proc_output;
-            assign bo_pixel_comb[i*16+15 : i*16] = proc_bo;
+            assign pixel_comb[i*2+1 : i*2] = frame_valid ? proc_output : 2'b00;
+            assign bo_pixel_comb[i*16+15 : i*16] = frame_valid ? proc_bo : proc_bi;
         end
     endgenerate
     assign al_diff = s4_active && (|al_diff_pixel);

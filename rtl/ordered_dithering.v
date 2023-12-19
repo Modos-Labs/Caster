@@ -26,7 +26,7 @@ module ordered_dithering (
     wire [3:0] b0, b1, b2, b3;
 
     generate
-    if (COLORMODE == "MONO") begin
+    if (COLORMODE == "MONO") begin: gen_mono_dither
         assign b0 =
             (y_pos[1:0] == 2'b00) ? (-4'd8) :
             (y_pos[1:0] == 2'b01) ? (4'd4) :
@@ -48,7 +48,7 @@ module ordered_dithering (
             (y_pos[1:0] == 2'b10) ? (4'd1) :
                                     (-4'd3);
     end
-    else if (COLORMODE == "DES") begin
+    else if (COLORMODE == "DES") begin: gen_des_dither
         assign b0 =
             (y_pos[2:0] == 3'd0) ? ((x_pos[1:0] == 3'd0) ? (4'd4) : (x_pos[1:0] == 3'd1) ? (4'd3) : (4'd7)) :
             (y_pos[2:0] == 3'd1) ? ((x_pos[1:0] == 3'd0) ? (4'd0) : (x_pos[1:0] == 3'd1) ? (4'd7) : (-4'd4)) :
@@ -82,10 +82,12 @@ module ordered_dithering (
     wire [3:0] c0, c1, c2, c3;
 
     localparam BIAS = 9'd10;
+    /* verilator lint_off UNUSEDSIGNAL */
     wire [8:0] a0 = {1'b0, vin[31:24]} + BIAS;
     wire [8:0] a1 = {1'b0, vin[23:16]} + BIAS;
     wire [8:0] a2 = {1'b0, vin[15:8]} + BIAS;
     wire [8:0] a3 = {1'b0, vin[7:0]} + BIAS;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     adder_sat adder_sat0 (a0[8:4], b0, c0);
     adder_sat adder_sat1 (a1[8:4], b1, c1);
