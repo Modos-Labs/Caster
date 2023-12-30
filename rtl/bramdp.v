@@ -12,20 +12,24 @@
 // Generic dual port RAM, could be replaced with device specific implementation.
 `timescale 1ns / 1ps
 `default_nettype none
-module bramdp(
+module bramdp #(
+    parameter ABITS = 12,
+    parameter DBITS = 8
+) (
     input wire clka,
     input wire wea,
-    input wire [11:0] addra,
-    input wire [7:0] dina,
-    output reg [7:0] douta,
+    input wire [ABITS-1:0] addra,
+    input wire [DBITS-1:0] dina,
+    output reg [DBITS-1:0] douta,
     input wire clkb,
     input wire web,
-    input wire [11:0] addrb,
-    input wire [7:0] dinb,
-    output reg [7:0] doutb
+    input wire [ABITS-1:0] addrb,
+    input wire [DBITS-1:0] dinb,
+    output reg [DBITS-1:0] doutb
 );
 
-    reg [7:0] mem [0:4095];
+    localparam DEPTH = 1 << ABITS;
+    reg [DBITS-1:0] mem [0:DEPTH-1];
 
     always @(posedge clka) begin
         if (wea)

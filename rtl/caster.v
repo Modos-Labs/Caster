@@ -10,6 +10,8 @@
 //
 // caster.v
 // EPD controller top-level
+// Note: for the top level interface, data lags behind the handshaking by 1
+// cycle, to be compatible with Xilinx FIFOs.
 `timescale 1ns / 1ps
 `default_nettype none
 `include "defines.vh"
@@ -315,6 +317,7 @@ module caster(
     wire s1_hactive = (scan_state != SCAN_IDLE) ? (
         (scan_h_cnt >= (hfp + hsync + hbp - PIPELINE_DELAY)) &&
         (scan_h_cnt < (htotal - PIPELINE_DELAY))) : 1'b0;
+    wire s1_hsync = (scan_state != SCAN_IDLE) ? (scan_h_cnt == 'd0) : 1'b0;
     /* verilator lint_on width */
     wire s1_active = scan_in_vact && s1_hactive;
     // Essentially a scan_in_act but few cycles eariler.
@@ -385,17 +388,44 @@ module caster(
     end
     endgenerate
 
+    // Degamma
+    wire [31:0] s2_pixel_linear;
+    genvar i;
+    generate
+        for (i = 0; i < 4; i = i + 1) begin: wvfm_lookup
+            degamma degamma (
+                .in(vin_pixel[i*8+2 +: 6]),
+                .out(s2_pixel_linear[i*8 +: 8])
+            );
+        end
+    endgenerate
+
     // Output dithered pixel 1 clock later
     ordered_dithering #(
         .COLORMODE(COLORMODE)
     ) ordered_dithering (
         .clk(clk),
         .rst(rst),
-        .vin(vin_pixel),
+        .vin(s2_pixel_linear),
         .vout(s2_pixel_ordered_dithered),
         .x_pos(x_pos),
         .y_pos(y_pos)
     );
+
+    wire [3:0] s2_pixel_ed1b_dithered;
+    wire [3:0] s2_ed1b_dithered_4b;
+    error_diffusion_dithering #(
+        .BPP(1)
+    ) ed1b_dithering (
+        .clk(clk),
+        .rst(rst),
+        .in(s2_pixel_linear[7:0]),
+        .in_valid(s2_active),
+        .hsync(s1_hsync),
+        .vsync(scan_in_vsync),
+        .out(s2_ed1b_dithered_4b)
+    );
+    assign s2_pixel_ed1b_dithered = {3'd0, s2_ed1b_dithered_4b[3]};
 
     // Slice Y8 input downto Y4
     wire [15:0] s1_vin_pixel_y4 = {vin_pixel[31:28], vin_pixel[23:20],
@@ -426,7 +456,6 @@ module caster(
     // 32 Kb
     wire [13:0] ram_addr_rd [0:3];
     wire [7:0] s3_lut_rd;
-    genvar i;
     generate
         for (i = 0; i < 4; i = i + 1) begin: wvfm_lookup
             // See pixel_processing.v comments for more details
@@ -480,11 +509,13 @@ module caster(
     reg [63:0] s3_bi_pixel;
     reg [15:0] s3_vin_pixel;
     reg [15:0] s3_pixel_ordered_dithered;
+    reg [3:0] s3_pixel_ed1b_dithered;
     reg [3:0] s3_op_valid;
     always @(posedge clk) begin
         s3_vin_pixel <= s2_vin_pixel;
         s3_bi_pixel <= s2_bi_pixel;
         s3_pixel_ordered_dithered <= s2_pixel_ordered_dithered;
+        s3_pixel_ed1b_dithered <= s2_pixel_ed1b_dithered;
         s3_op_valid <= s2_op_valid;
     end
 
@@ -503,7 +534,7 @@ module caster(
         for (i = 0; i < 4; i = i + 1) begin: pix_proc
             wire [3:0] proc_p_or = s3_vin_pixel[i*4+3 : i*4];
             wire [3:0] proc_p_od = s3_pixel_ordered_dithered[i*4+3 : i*4];
-            wire [3:0] proc_p_e1 = 4'd0; // not implemented yet
+            wire [3:0] proc_p_e1 = {4{s3_pixel_ed1b_dithered[i]}};
             wire [3:0] proc_p_e4 = 4'd0; // not implemented yet
             wire [15:0] proc_bi = s3_bi_pixel[i*16+15 : i*16];
             wire [15:0] proc_bo;
@@ -563,7 +594,8 @@ module caster(
     assign epd_gdsp = (scan_in_vsync) ? 1'b0 : 1'b1;
     assign epd_sdoe = epd_gdoe;
 
-    assign epd_sd = current_pixel;
+    // CHANGE THIS
+    assign epd_sd = {6'd0, current_pixel[1:0]}; // hack
     // stl
     assign epd_sdce0 = (scan_in_act) ? 1'b0 : 1'b1;
     assign epd_sdle = (scan_in_hsync) ? 1'b1 : 1'b0;
