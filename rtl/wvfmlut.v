@@ -20,10 +20,10 @@ module wvfmlut(
     input wire [7:0] din,
     // Read port A
     input wire [13:0] addra,
-    output reg [1:0] douta,
+    output wire [1:0] douta,
     // Read port B
     input wire [13:0] addrb,
-    output reg [1:0] doutb
+    output wire [1:0] doutb
 );
 
     wire [7:0] bram_douta;

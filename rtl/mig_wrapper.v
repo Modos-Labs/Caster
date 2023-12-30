@@ -123,7 +123,7 @@ module mig_wrapper(
         .c3_p0_wr_empty         (mig_wr_empty),
         .c3_p0_wr_count         (mig_wr_count),
         .c3_p0_wr_underrun      (mig_wr_underrun),
-        .c3_p0_wr_error         (mig_wr_error),
+        .c3_p0_wr_error         (wr_error),
         .c3_p0_rd_clk           (clk_mif),
         .c3_p0_rd_en            (mig_rd_en),
         .c3_p0_rd_data          (mig_rd_data),
@@ -131,7 +131,7 @@ module mig_wrapper(
         .c3_p0_rd_empty         (mig_rd_empty),
         .c3_p0_rd_count         (mig_rd_count),
         .c3_p0_rd_overflow      (mig_rd_overflow),
-        .c3_p0_rd_error         (mig_rd_error)
+        .c3_p0_rd_error         (rd_error)
     );
 
     assign error = wr_error || rd_error;

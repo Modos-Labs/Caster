@@ -17,7 +17,8 @@
 module error_diffusion_dithering #(
     parameter INPUT_BITS = 8, // Fixed 8, only 6 MSBs are used
     parameter OUTPUT_BITS = 4, // 1 or 4
-    parameter PIXEL_RATE = 4 // pixels per cycle
+    parameter PIXEL_RATE = 4, // pixels per cycle
+	 parameter PIXEL_RATE_LOG2 = 2 // $clog2(PIXEL_RATE) is not supported by ISE
 ) (
     input wire clk,
     input wire rst,
@@ -31,7 +32,7 @@ module error_diffusion_dithering #(
     // Error uses 8p1 fixed point format, range -256 (-128) to 255 (127.5)
     // Note to the 
     localparam ERROR_BITS = 9;
-    localparam EB_ABITS = 12 / $clog2(PIXEL_RATE);
+    localparam EB_ABITS = 12 / PIXEL_RATE_LOG2;
     localparam EB_DBITS = ERROR_BITS * PIXEL_RATE;
 
     // input/output shuffle
@@ -99,7 +100,7 @@ module error_diffusion_dithering #(
 
     genvar i;
     generate
-        for (i = 0; i < PIXEL_RATE; i += 1) begin: gen_kernel
+        for (i = 0; i < PIXEL_RATE; i = i + 1) begin: gen_kernel
             error_diffusion_kernel #(
                 .INPUT_BITS(INPUT_BITS),
                 .OUTPUT_BITS(OUTPUT_BITS),
@@ -131,7 +132,7 @@ module error_diffusion_dithering #(
     assign eb_wr = err_bl[ERROR_BITS*PIXEL_RATE-1:0];
 
     // Assign IO shuffle
-    generate for (i = 0; i < PIXEL_RATE; i += 1) begin
+    generate for (i = 0; i < PIXEL_RATE; i = i + 1) begin: gen_io_shuffle
         assign in_r[i*INPUT_BITS+:INPUT_BITS] =
                 in[(PIXEL_RATE-1-i)*INPUT_BITS+:INPUT_BITS];
         assign out_r[i*OUTPUT_BITS+:OUTPUT_BITS] =

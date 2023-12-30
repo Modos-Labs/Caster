@@ -329,6 +329,7 @@ module caster(
     wire [10:0] v_cnt_offset = scan_v_cnt - (vfp + vsync + vbp);
     /* verilator lint_on width */
     wire [3:0] s1_op_valid;
+	 genvar i;
     generate
         for (i = 0; i < 4; i = i + 1) begin: op_valid_assign
             wire [1:0] offset = i;
@@ -390,9 +391,8 @@ module caster(
 
     // Degamma
     wire [31:0] s2_pixel_linear;
-    genvar i;
     generate
-        for (i = 0; i < 4; i = i + 1) begin: wvfm_lookup
+        for (i = 0; i < 4; i = i + 1) begin: gen_degamma
             degamma degamma (
                 .in(vin_pixel[i*8+2 +: 6]),
                 .out(s2_pixel_linear[i*8 +: 8])
@@ -457,7 +457,7 @@ module caster(
     wire [13:0] ram_addr_rd [0:3];
     wire [7:0] s3_lut_rd;
     generate
-        for (i = 0; i < 4; i = i + 1) begin: wvfm_lookup
+        for (i = 0; i < 4; i = i + 1) begin: gen_wvfm_lookup
             // See pixel_processing.v comments for more details
             // Only used for LUT modes.
             // Local counter (per pixel counter) is used for manual LUT modes

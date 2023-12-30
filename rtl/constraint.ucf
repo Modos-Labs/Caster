@@ -18,9 +18,9 @@ TIMESPEC "ts_clkepdc" = PERIOD "clkepdc" 25ns HIGH 50 %;
 ##################################################################################
 # Timing Ignore constraints for paths crossing the clock domain 
 ##################################################################################
-NET "memif/s6_ddr3/memc3_wrapper_inst/mcb_ui_top_inst/mcb_raw_wrapper_inst/selfrefresh_mcb_mode" TIG;
-NET "memif/s6_ddr3/c3_pll_lock" TIG;
-INST "memif/s6_ddr3/memc3_wrapper_inst/mcb_ui_top_inst/mcb_raw_wrapper_inst/gen_term_calib.mcb_soft_calibration_top_inst/mcb_soft_calibration_inst/DONE_SOFTANDHARD_CAL*" TIG;
+NET "mig_wrapper/s6_ddr3/memc3_wrapper_inst/mcb_ui_top_inst/mcb_raw_wrapper_inst/selfrefresh_mcb_mode" TIG;
+NET "mig_wrapper/s6_ddr3/c3_pll_lock" TIG;
+INST "mig_wrapper/s6_ddr3/memc3_wrapper_inst/mcb_ui_top_inst/mcb_raw_wrapper_inst/gen_term_calib.mcb_soft_calibration_top_inst/mcb_soft_calibration_inst/DONE_SOFTANDHARD_CAL*" TIG;
 
 ############################################################################
 ## Memory Controller 3                               

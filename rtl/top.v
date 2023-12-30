@@ -450,14 +450,6 @@ module top(
     );
 
     caster #(
-        .H_FP(EPDC_H_FP),
-        .H_SYNC(EPDC_H_SYNC),
-        .H_BP(EPDC_H_BP),
-        .H_ACT(EPDC_H_ACT),
-        .V_FP(EPDC_V_FP),
-        .V_SYNC(EPDC_V_SYNC),
-        .V_BP(EPDC_V_BP),
-        .V_ACT(EPDC_V_ACT),
         .SIMULATION(SIMULATION),
         .COLORMODE(COLORMODE)
     )
@@ -490,7 +482,7 @@ module top(
     );
     
     // Debug
-    wire [35:0] chipscope_control0;
+    /*wire [35:0] chipscope_control0;
     
     chipscope_icon icon (
         .CONTROL0(chipscope_control0) // INOUT BUS [35:0]
@@ -507,7 +499,7 @@ module top(
             sys_rst,
             3'b0
         })
-    );
+    );*/
     
     assign EPD_SD[15:8] = EPD_SD[7:0];
 
