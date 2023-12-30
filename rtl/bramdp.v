@@ -14,7 +14,9 @@
 `default_nettype none
 module bramdp #(
     parameter ABITS = 12,
-    parameter DBITS = 8
+    parameter DBITS = 8,
+    parameter INITIALIZE = 0,
+    parameter INIT_FILE = ""
 ) (
     input wire clka,
     input wire wea,
@@ -45,8 +47,12 @@ module bramdp #(
             doutb <= mem[addrb];
     end
     
-    initial begin
-        $readmemh("default_waveform.mem", mem);
-    end
+    generate
+        if (INITIALIZE == 1) begin
+            initial begin
+                $readmemh(INIT_FILE, mem);
+            end
+        end
+    endgenerate
 
 endmodule

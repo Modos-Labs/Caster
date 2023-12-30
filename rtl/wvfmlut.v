@@ -29,7 +29,12 @@ module wvfmlut(
     wire [7:0] bram_douta;
     wire [7:0] bram_doutb;
 
-    bramdp bramdp0 (
+    bramdp #(
+        .ABITS(12),
+        .DBITS(8),
+        .INITIALIZE(1),
+        .INIT_FILE("default_waveform.mem")
+    ) bramdp0 (
         .clka(clk),
         .wea(we),
         .addra(we ? addr : addra[13:2]),

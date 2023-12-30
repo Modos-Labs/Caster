@@ -15,23 +15,28 @@
 `default_nettype none
 `timescale 1ns / 1ps
 module error_diffusion_dithering #(
-    parameter BPP = 4 // 1 or 4
+    parameter INPUT_BITS = 8, // Fixed 8, only 6 MSBs are used
+    parameter OUTPUT_BITS = 4, // 1 or 4
+    parameter PIXEL_RATE = 4 // pixels per cycle
 ) (
     input wire clk,
     input wire rst,
-    input wire [7:0] in,
+    input wire [INPUT_BITS*PIXEL_RATE-1:0] in,
     input wire in_valid,
     input wire hsync,
     input wire vsync,
-    output reg [3:0] out
+    output reg [OUTPUT_BITS*PIXEL_RATE-1:0] out
 );
 
     // Error uses 8p1 fixed point format, range -256 (-128) to 255 (127.5)
     // Note to the 
     localparam ERROR_BITS = 9;
-    localparam INPUT_BITS = 8;
-    localparam EB_ABITS = 12;
-    localparam EB_DBITS = ERROR_BITS;
+    localparam EB_ABITS = 12 / $clog2(PIXEL_RATE);
+    localparam EB_DBITS = ERROR_BITS * PIXEL_RATE;
+
+    // input/output shuffle
+    wire [INPUT_BITS*PIXEL_RATE-1:0] in_r;
+    wire [OUTPUT_BITS*PIXEL_RATE-1:0] out_r;
 
     // error buffer (eb)
     wire [EB_ABITS-1:0] eb_rptr;
@@ -57,104 +62,87 @@ module error_diffusion_dithering #(
 
     reg first_line;
     reg line_valid;
-    reg [11:0] x_counter;
+    reg [EB_ABITS-1:0] x_counter;
     // delayed by 1 clk
     reg s1_valid;
-    reg [11:0] s1_x_counter;
+    reg [EB_ABITS-1:0] s1_x_counter;
     // delayed by 2 clks
     reg s2_valid;
-    reg [11:0] s2_x_counter;
+    reg [EB_ABITS-1:0] s2_x_counter;
     
-    reg [ERROR_BITS-1:0] err_bl; // bottom left, for WB
+    // The wb buffer functions like a shift register, for the first cycle only
+    // 3 pixels are valid and for the last cycle only 1 pixel is valid. For all
+    // cycles in the middle, 4 pixels are valid.
+    // 1st cycle [ P03 P02 P01 P00 --- --- --- ]
+    // 2nd cycle [ P13 P12 P11 P10 P03 P02 P01 ]
+    reg [ERROR_BITS*(PIXEL_RATE*2-1)-1:0] err_bl; // bottom left, write back buffer
     reg [ERROR_BITS-1:0] err_r; // right
     reg [ERROR_BITS-1:0] err_b; // bottom
     reg [ERROR_BITS-1:0] err_br; // bottom right
 
     // Suppress error buffer for the first line (last line from previous frame)
-    wire [ERROR_BITS-1:0] err_eb = first_line ? 'd0 : eb_rd;
+    wire [ERROR_BITS*PIXEL_RATE-1:0] err_eb = first_line ? 'd0 : eb_rd;
 
-    wire [11:0] x_counter_inc = x_counter + 'd1;
+    wire [EB_ABITS-1:0] x_counter_inc = x_counter + 'd1;
 
-    wire [ERROR_BITS+1-1:0] err_adder = $signed(err_r) + $signed(err_eb);
-    wire [ERROR_BITS+1-1:0] pix_adder =
-            $signed({{(ERROR_BITS-INPUT_BITS+1){1'b0}}, in}) +
-            $signed(err_adder[ERROR_BITS+1-1:1]);
+    // Outputs kernel
+    wire [ERROR_BITS*PIXEL_RATE-1:0] err_r_out;
+    wire [ERROR_BITS*PIXEL_RATE-1:0] err_bl_out;
+    wire [ERROR_BITS*PIXEL_RATE-1:0] err_b_out;
+    wire [ERROR_BITS*PIXEL_RATE-1:0] err_br_out;
+    wire [OUTPUT_BITS*PIXEL_RATE-1:0] quant_out;
 
-    // Quantizer
-    // The quantizer should pick the closest color in the linear space.
-    // For 1-bit output, bit truncation (using MSB) gives the correct result.
-    // For 4-bit output, a coarse LUT is used for the purpose. 
-    // While the pixels here are in the linear space, the
-    // quantized points may or may not (depending on the screen calibration).
-    // For error diffusion this is compensated by the feedback loop.
-    wire [3:0] pix_quant_in_range;
+    wire [ERROR_BITS*(PIXEL_RATE*2-1)-1:0] err_bl_next;
+    wire [ERROR_BITS-1:0] err_r_next;
+    wire [ERROR_BITS-1:0] err_b_next;
+    wire [ERROR_BITS-1:0] err_br_next;
+
+    genvar i;
     generate
-        if (BPP == 1) begin
-            assign pix_quant_in_range = {4{pix_adder[7]}};
-        end
-        else if (BPP == 4) begin
-            // TODO
-            assign pix_quant_in_range = pix_adder[7:4];
-        end
-    endgenerate
-    // WARN: This detection would fail if adder is not 10 bits
-    wire [3:0] pix_quantized =
-            pix_adder[9] ? 4'd0 : // underflow
-            pix_adder[8] ? 4'd15 : // overflow
-            pix_quant_in_range;
-    
-    // Convert back to linear scale
-    wire [7:0] pix_qlinear;
-    generate
-        if (BPP == 1) begin
-            assign pix_qlinear = pix_quantized[7] ? 8'hff : 8'h00;
-        end
-        else if (BPP == 4) begin
-            // Easier to just use degamma again
-            degamma quant_degamma (
-                .in({pix_quantized, pix_quantized[3:2]}),
-                .out(pix_qlinear)
+        for (i = 0; i < PIXEL_RATE; i += 1) begin: gen_kernel
+            error_diffusion_kernel #(
+                .INPUT_BITS(INPUT_BITS),
+                .OUTPUT_BITS(OUTPUT_BITS),
+                .ERROR_BITS(ERROR_BITS)
+            ) kernel (
+                .pixel_in(in_r[i*INPUT_BITS+:INPUT_BITS]),
+                .err_line_buffer_in(err_eb[i*ERROR_BITS+:ERROR_BITS]),
+                .err_left_in((i == 0) ? err_r : err_r_out[(i-1)*ERROR_BITS+:ERROR_BITS]),
+                .err_bottom_left_in((i == 0) ? err_b : err_b_out[(i-1)*ERROR_BITS+:ERROR_BITS]),
+                .err_bottom_in((i == 0) ? err_br : err_br_out[(i-1)*ERROR_BITS+:ERROR_BITS]),
+                .pixel_out(quant_out[i*OUTPUT_BITS+:OUTPUT_BITS]),
+                .err_right_out(err_r_out[i*ERROR_BITS+:ERROR_BITS]),
+                .err_bottom_left_out(err_bl_out[i*ERROR_BITS+:ERROR_BITS]),
+                .err_bottom_out(err_b_out[i*ERROR_BITS+:ERROR_BITS]),
+                .err_bottom_right_out(err_br_out[i*ERROR_BITS+:ERROR_BITS])
             );
         end
     endgenerate
 
-    // Calculate error
-    wire [ERROR_BITS+2-1:0] quant_err = $signed(pix_adder) - $signed({2'b0, pix_qlinear});
-
-    // Distribute error
-    wire [ERROR_BITS+5-1:0] err_r_mult = $signed(quant_err) * 7;
-    wire [ERROR_BITS+5-1:0] err_bl_mult = $signed(quant_err) * 3;
-    wire [ERROR_BITS+5-1:0] err_b_mult = $signed(quant_err) * 5;
-    wire [ERROR_BITS+5-1:0] err_br_mult = $signed(quant_err) * 1;
-    // Divide only by 8 (instead of 16) to get 10p1 fixed point format
-    wire [ERROR_BITS+2-1:0] err_r_div = err_r_mult[ERROR_BITS+5-1:3];
-    wire [ERROR_BITS+2-1:0] err_bl_div = err_bl_mult[ERROR_BITS+5-1:3];
-    wire [ERROR_BITS+2-1:0] err_b_div = err_b_mult[ERROR_BITS+5-1:3];
-    wire [ERROR_BITS+2-1:0] err_br_div = err_br_mult[ERROR_BITS+5-1:3];
-    
-    //    X r
-    // bl b br
-
-    //   .    r+X  `r
-    // b+`bl br+`b `br
-
-    wire [ERROR_BITS-1:0] err_r_next;
-    clamp_11_to_9 err_r_clamp (.in(err_r_div), .out(err_r_next));
-    
-    wire [ERROR_BITS+2-1:0] err_b_acc = $signed(err_b_div) + $signed({err_br[ERROR_BITS-1], err_br});
-    wire [ERROR_BITS-1:0] err_b_next;
-    clamp_11_to_9 err_b_clamp (.in(err_b_acc), .out(err_b_next));
-    
-    wire [ERROR_BITS-1:0] err_br_next;
-    clamp_11_to_9 err_br_clamp (.in(err_br_div), .out(err_br_next));
-    
-    wire [ERROR_BITS+2-1:0] err_bl_acc = $signed(err_bl_div) + $signed({err_b[ERROR_BITS-1], err_b});
-    wire [ERROR_BITS-1:0] err_bl_next;
-    clamp_11_to_9 err_bl_clamp (.in(err_bl_acc), .out(err_bl_next));
+    // Assign register next value
+    assign err_bl_next = {err_bl_out, err_bl[ERROR_BITS*PIXEL_RATE+:(PIXEL_RATE-1)*ERROR_BITS]};
+    // For bl, other pixels output are assigned in the generate for loop
+    assign err_r_next = err_r_out[(PIXEL_RATE-1)*ERROR_BITS+:ERROR_BITS];
+    assign err_b_next = err_b_out[(PIXEL_RATE-1)*ERROR_BITS+:ERROR_BITS];
+    assign err_br_next = err_br_out[(PIXEL_RATE-1)*ERROR_BITS+:ERROR_BITS];
 
     assign eb_we = s2_valid; // intentionally dropping 1st pixel
     assign eb_wptr = s2_x_counter;
-    assign eb_wr = err_bl;
+    assign eb_wr = err_bl[ERROR_BITS*PIXEL_RATE-1:0];
+
+    // Assign IO shuffle
+    generate for (i = 0; i < PIXEL_RATE; i += 1) begin
+        assign in_r[i*INPUT_BITS+:INPUT_BITS] =
+                in[(PIXEL_RATE-1-i)*INPUT_BITS+:INPUT_BITS];
+        assign out_r[i*OUTPUT_BITS+:OUTPUT_BITS] =
+                quant_out[(PIXEL_RATE-1-i)*OUTPUT_BITS+:OUTPUT_BITS];
+    end endgenerate
+
+    // For debugging visibility
+    // wire [ERROR_BITS-1:0] eb_wr_expanded [0:PIXEL_RATE-1];
+    // generate for (i = 0; i < PIXEL_RATE; i += 1)
+    //     assign eb_wr_expanded[i] = eb_wr[i*ERROR_BITS+:ERROR_BITS];
+    // endgenerate
 
     assign eb_rptr = in_valid ? x_counter_inc : 'd0;
 
@@ -204,7 +192,7 @@ module error_diffusion_dithering #(
         end
 
         // Output
-        out <= pix_quantized;
+        out <= out_r;
 
         if (rst) begin
             s1_valid <= 1'b0;

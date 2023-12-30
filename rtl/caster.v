@@ -413,19 +413,19 @@ module caster(
     );
 
     wire [3:0] s2_pixel_ed1b_dithered;
-    wire [3:0] s2_ed1b_dithered_4b;
     error_diffusion_dithering #(
-        .BPP(1)
+        .INPUT_BITS(8),
+        .OUTPUT_BITS(1),
+        .PIXEL_RATE(4)
     ) ed1b_dithering (
         .clk(clk),
         .rst(rst),
-        .in(s2_pixel_linear[7:0]),
+        .in(s2_pixel_linear),
         .in_valid(s2_active),
         .hsync(s1_hsync),
         .vsync(scan_in_vsync),
-        .out(s2_ed1b_dithered_4b)
+        .out(s2_pixel_ed1b_dithered)
     );
-    assign s2_pixel_ed1b_dithered = {3'd0, s2_ed1b_dithered_4b[3]};
 
     // Slice Y8 input downto Y4
     wire [15:0] s1_vin_pixel_y4 = {vin_pixel[31:28], vin_pixel[23:20],
@@ -594,8 +594,7 @@ module caster(
     assign epd_gdsp = (scan_in_vsync) ? 1'b0 : 1'b1;
     assign epd_sdoe = epd_gdoe;
 
-    // CHANGE THIS
-    assign epd_sd = {6'd0, current_pixel[1:0]}; // hack
+    assign epd_sd = current_pixel;
     // stl
     assign epd_sdce0 = (scan_in_act) ? 1'b0 : 1'b1;
     assign epd_sdle = (scan_in_hsync) ? 1'b1 : 1'b0;
