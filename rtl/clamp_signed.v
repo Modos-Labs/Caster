@@ -10,15 +10,25 @@
 //
 `default_nettype none
 `timescale 1ns / 1ps
-module clamp_11_to_9(
-    input wire [10:0] in,
-    output wire [8:0] out
+module clamp_signed #(
+    parameter INPUT_BITS = 11,
+    parameter OUTPUT_BITS = 9
+) (
+    input wire [INPUT_BITS-1:0] in,
+    output wire [OUTPUT_BITS-1:0] out
 );
 
+    localparam BIT_DIFF = INPUT_BITS - OUTPUT_BITS;
+
+    wire underflow = in[INPUT_BITS-1] &&
+            (in[INPUT_BITS-2:OUTPUT_BITS-1] != {BIT_DIFF{1'b1}});
+    wire overflow = !in[INPUT_BITS-1] &&
+            (in[INPUT_BITS-2:OUTPUT_BITS-1] != {BIT_DIFF{1'b0}});
+
     assign out =
-        (in[10] && (in[9:8] != 2'b11)) ? 9'b100000000 : // underflow
-        (!in[10] && (in[9:8] != 2'b00)) ? 9'b011111111 : // overflow
-        {in[10], in[7:0]};
+        underflow ? {1'b1, {(OUTPUT_BITS-1){1'b0}}} :
+        overflow ? {1'b0, {(OUTPUT_BITS-1){1'b1}}} :
+        {in[INPUT_BITS-1], in[OUTPUT_BITS-2:0]};
 
 endmodule
 `default_nettype wire

@@ -82,19 +82,19 @@ module error_diffusion_kernel #(
     endgenerate
 
     // Calculate error
-    wire [ERROR_BITS+2-1:0] quant_err =
+    wire [ERROR_BITS+1-1:0] quant_err =
             $signed(pix_adder) - $signed({2'b0, pix_qlinear});
 
     // Distribute error
-    wire [ERROR_BITS+5-1:0] err_r_mult = $signed(quant_err) * 7;
-    wire [ERROR_BITS+5-1:0] err_bl_mult = $signed(quant_err) * 3;
-    wire [ERROR_BITS+5-1:0] err_b_mult = $signed(quant_err) * 5;
-    wire [ERROR_BITS+5-1:0] err_br_mult = $signed(quant_err) * 1;
+    wire [ERROR_BITS+4-1:0] err_r_mult = $signed(quant_err) * 8;
+    wire [ERROR_BITS+4-1:0] err_bl_mult = $signed(quant_err) * 4;
+    wire [ERROR_BITS+4-1:0] err_b_mult = $signed(quant_err) * 3;
+    wire [ERROR_BITS+4-1:0] err_br_mult = $signed(quant_err) * 1;
     // Divide only by 8 (instead of 16) to get 10p1 fixed point format
-    wire [ERROR_BITS+2-1:0] err_r_div = err_r_mult[ERROR_BITS+5-1:3];
-    wire [ERROR_BITS+2-1:0] err_bl_div = err_bl_mult[ERROR_BITS+5-1:3];
-    wire [ERROR_BITS+2-1:0] err_b_div = err_b_mult[ERROR_BITS+5-1:3];
-    wire [ERROR_BITS+2-1:0] err_br_div = err_br_mult[ERROR_BITS+5-1:3];
+    wire [ERROR_BITS+1-1:0] err_r_div = err_r_mult[ERROR_BITS+4-1:3];
+    wire [ERROR_BITS+1-1:0] err_bl_div = err_bl_mult[ERROR_BITS+4-1:3];
+    wire [ERROR_BITS+1-1:0] err_b_div = err_b_mult[ERROR_BITS+4-1:3];
+    wire [ERROR_BITS+1-1:0] err_br_div = err_br_mult[ERROR_BITS+4-1:3];
     
     //    X r
     // bl b br
@@ -103,18 +103,22 @@ module error_diffusion_kernel #(
     // b+`bl br+`b `br
 
     // Accumulate the error from pixels on the left before writing to BRAM
-    wire [ERROR_BITS+2-1:0] err_b_acc =
+    wire [ERROR_BITS+1-1:0] err_b_acc =
             $signed(err_b_div) +
             $signed({err_bottom_in[ERROR_BITS-1], err_bottom_in});
-    wire [ERROR_BITS+2-1:0] err_bl_acc =
+    wire [ERROR_BITS+1-1:0] err_bl_acc =
             $signed(err_bl_div) +
             $signed({err_bottom_left_in[ERROR_BITS-1], err_bottom_left_in});
 
     // Clamp and output
-    clamp_11_to_9 err_r_clamp (.in(err_r_div), .out(err_right_out));
-    clamp_11_to_9 err_b_clamp (.in(err_b_acc), .out(err_bottom_out));
-    clamp_11_to_9 err_br_clamp (.in(err_br_div), .out(err_bottom_right_out)); 
-    clamp_11_to_9 err_bl_clamp (.in(err_bl_acc), .out(err_bottom_left_out));
+    clamp_signed #(.INPUT_BITS(ERROR_BITS+1), .OUTPUT_BITS(ERROR_BITS))
+            err_r_clamp (.in(err_r_div), .out(err_right_out));
+    clamp_signed #(.INPUT_BITS(ERROR_BITS+1), .OUTPUT_BITS(ERROR_BITS))
+            err_b_clamp (.in(err_b_acc), .out(err_bottom_out));
+    clamp_signed #(.INPUT_BITS(ERROR_BITS+1), .OUTPUT_BITS(ERROR_BITS))
+            err_br_clamp (.in(err_br_div), .out(err_bottom_right_out)); 
+    clamp_signed #(.INPUT_BITS(ERROR_BITS+1), .OUTPUT_BITS(ERROR_BITS))
+            err_bl_clamp (.in(err_bl_acc), .out(err_bottom_left_out));
 
 endmodule
 `default_nettype wire
