@@ -61,15 +61,14 @@ module error_diffusion_kernel #(
             assign pix_qlinear = pix_quantized ? 8'hff : 8'h00;
         end
         else if (OUTPUT_BITS == 4) begin
-            wire [3:0] pix_quantized =
-                pix_adder[9] ? 4'd0 : // underflow
-                pix_adder[8] ? 4'd15 : // overflow
-                pix_adder[7:4];
-            assign pixel_out = pix_quantized;
-            // Easier to just use degamma again
-            degamma quant_degamma (
-                .in({pix_quantized, pix_quantized[3:2]}),
-                .out(pix_qlinear)
+            wire [7:0] pix_clamped =
+                pix_adder[9] ? 8'd0 : // underflow
+                pix_adder[8] ? 8'd255 : // overflow
+                pix_adder[7:0];
+            linear_4b_quantizer linear_4b_quantizer (
+                .in(pix_clamped),
+                .index(pixel_out),
+                .linear(pix_qlinear)
             );
         end
     endgenerate
@@ -79,9 +78,9 @@ module error_diffusion_kernel #(
             $signed(pix_adder) - $signed({2'b0, pix_qlinear});
 
     // Distribute error
-    wire [ERROR_BITS+4-1:0] err_r_mult = $signed(quant_err) * 8;
-    wire [ERROR_BITS+4-1:0] err_bl_mult = $signed(quant_err) * 4;
-    wire [ERROR_BITS+4-1:0] err_b_mult = $signed(quant_err) * 3;
+    wire [ERROR_BITS+4-1:0] err_r_mult = $signed(quant_err) * 7;
+    wire [ERROR_BITS+4-1:0] err_bl_mult = $signed(quant_err) * 3;
+    wire [ERROR_BITS+4-1:0] err_b_mult = $signed(quant_err) * 5;
     wire [ERROR_BITS+4-1:0] err_br_mult = $signed(quant_err) * 1;
     // Divide only by 8 (instead of 16) to get 10p1 fixed point format
     wire [ERROR_BITS+1-1:0] err_r_div = err_r_mult[ERROR_BITS+4-1:3];
