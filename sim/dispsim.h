@@ -31,4 +31,5 @@ constexpr int DISP_HEIGHT = 120;
 void dispsim_reset();
 void dispsim_apply(uint32_t *pixels, const uint8_t gdoe,
         const uint8_t gdclk, const uint8_t gdsp, const uint8_t sdle,
-        const uint8_t sdoe, const uint8_t sd, const uint8_t sdce0);
+        const uint8_t sdoe, const uint8_t sd, const uint8_t sdce0,
+        const uint16_t dbg);

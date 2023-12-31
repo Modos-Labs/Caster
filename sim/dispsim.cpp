@@ -27,57 +27,47 @@
 #include <SDL.h>
 
 static uint8_t localbuf[DISP_WIDTH * DISP_HEIGHT];
-static int8_t accelbuf[DISP_WIDTH * DISP_HEIGHT];
+static int8_t speedbuf[DISP_WIDTH * DISP_HEIGHT];
 
 static int x_counter;
 static int y_counter;
 static int last_hs;
 
-#define SPEED 45
+#define USE_DBG_OUTPUT
+
+#define ACCEL 4
 
 void render_copy(); // Function in main.cpp
 
 void dispsim_set_pixel(uint32_t *pixels, int x, int y, uint8_t input) {
+#ifdef USE_DBG_OUTPUT
+    int32_t pixel = input | (input << 4);
+#else
+    // Note: this is very wrong
     int32_t pixel = localbuf[y * DISP_WIDTH + x];
-    int8_t accel = accelbuf[y * DISP_WIDTH + x];
-    if (input == 1) {
-        // black
-        if (accel >= 0) {
-            accel = 0-SPEED;
-        }
-        else {
-            accel = accel * 0.8f;
-            if (accel > -5) accel = -5;
-        }
+    int32_t speed = speedbuf[y * DISP_WIDTH + x];
+    int8_t accel = (input == 1) ? (0-ACCEL) : (input == 2) ? (ACCEL) : 0;
 
-        if (pixel > (0 - accel))
-            pixel += accel;
-        else
-            pixel = 0;
-    }
-    else if (input == 2) {
-        // white
-        if (accel <= 0) {
-            accel = SPEED;
-        }
-        else {
-            accel = accel * 0.8f;
-            if (accel < 5) accel = 5;
-        }
+    speed += accel;
+    pixel += speed;
 
-        if (pixel < (255 - accel))
-            pixel += accel;
-        else {
-            //printf("Location %d %d, overdriving, not good\n", x, y);
-            pixel = 255;
-        }
-    }
-    else {
-        accel = 0;
-    }
+    if (speed > 127)
+        speed = 127;
+    else if (speed < -128)
+        speed = -128;
+    // without external acceleration, it de-accelerate itself
+    speed *= 0.9f;
+
+    if (pixel > 255)
+        pixel = 255;
+    else if (pixel < 0)
+        pixel = 0;
+
     // otherwise, nop
     localbuf[y * DISP_WIDTH + x] = pixel;
-    accelbuf[y * DISP_WIDTH + x] = accel;
+    speedbuf[y * DISP_WIDTH + x] = speed;
+#endif
+
 #ifdef DES
     int c = (x_counter + (DISP_HEIGHT - y_counter)) % 3;
     if (c == 0)
@@ -119,7 +109,8 @@ void dispsim_render() {
 
 void dispsim_apply(uint32_t *pixels, const uint8_t gdoe,
         const uint8_t gdclk, const uint8_t gdsp, const uint8_t sdle,
-        const uint8_t sdoe, const uint8_t sd, const uint8_t sdce0) {
+        const uint8_t sdoe, const uint8_t sd, const uint8_t sdce0,
+        const uint16_t dbg) {
     // SDLE = Hsync
     // GDSP = ~ Vsync
     // SDCE0 = ~ DE
@@ -142,10 +133,17 @@ void dispsim_apply(uint32_t *pixels, const uint8_t gdoe,
     }
 
     if (de) {
+#ifdef USE_DBG_OUTPUT
+        dispsim_set_pixel(pixels, x_counter++, y_counter, (dbg >> 12) & 0xf);
+        dispsim_set_pixel(pixels, x_counter++, y_counter, (dbg >> 8) & 0xf);
+        dispsim_set_pixel(pixels, x_counter++, y_counter, (dbg >> 4) & 0xf);
+        dispsim_set_pixel(pixels, x_counter++, y_counter, (dbg >> 0) & 0xf);
+#else
         dispsim_set_pixel(pixels, x_counter++, y_counter, (sd >> 6) & 0x3);
         dispsim_set_pixel(pixels, x_counter++, y_counter, (sd >> 4) & 0x3);
         dispsim_set_pixel(pixels, x_counter++, y_counter, (sd >> 2) & 0x3);
         dispsim_set_pixel(pixels, x_counter++, y_counter, (sd >> 0) & 0x3);
+#endif
         line_valid = true;
     }
 

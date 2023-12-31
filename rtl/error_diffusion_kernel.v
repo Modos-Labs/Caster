@@ -44,34 +44,27 @@ module error_diffusion_kernel #(
     // Quantizer
     // The quantizer should pick the closest color in the linear space.
     // For 1-bit output, bit truncation (using MSB) gives the correct result.
-    // For 4-bit output, a coarse LUT is used for the purpose. 
+    // For 4-bit output, bit truncation yields the wrong result, but for timing
+    // closure this is used instead of implenting it properly
     // While the pixels here are in the linear space, the
     // quantized points may or may not (depending on the screen calibration).
     // For error diffusion this is compensated by the feedback loop.
-    wire [3:0] pix_quant_in_range;
-    generate
-        if (OUTPUT_BITS == 1) begin
-            assign pix_quant_in_range = {4{pix_adder[7]}};
-        end
-        else if (OUTPUT_BITS == 4) begin
-            // TODO
-            assign pix_quant_in_range = pix_adder[7:4];
-        end
-    endgenerate
-    // WARN: This detection would fail if adder is not 10 bits
-    wire [3:0] pix_quantized =
-            pix_adder[9] ? 4'd0 : // underflow
-            pix_adder[8] ? 4'd15 : // overflow
-            pix_quant_in_range;
-     
-    // Assign output and convert back to linear scale
+    // WARN: underflow and overflow detection would fail if adder is not 10 bits
     wire [7:0] pix_qlinear;
     generate
         if (OUTPUT_BITS == 1) begin
-            assign pixel_out = pix_quantized[3];
-            assign pix_qlinear = pix_quantized[3] ? 8'hff : 8'h00;
+            wire pix_quantized =
+                pix_adder[9] ? 1'b0 : // underflow
+                pix_adder[8] ? 1'b1 : // overflow
+                pix_adder[7];
+            assign pixel_out = pix_quantized;
+            assign pix_qlinear = pix_quantized ? 8'hff : 8'h00;
         end
         else if (OUTPUT_BITS == 4) begin
+            wire [3:0] pix_quantized =
+                pix_adder[9] ? 4'd0 : // underflow
+                pix_adder[8] ? 4'd15 : // overflow
+                pix_adder[7:4];
             assign pixel_out = pix_quantized;
             // Easier to just use degamma again
             degamma quant_degamma (

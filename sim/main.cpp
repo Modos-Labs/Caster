@@ -63,7 +63,7 @@ void testmain(void) {
         spi_write_reg8(CSR_CFG_V_SYNC, 1);
         spi_write_reg8(CSR_CFG_V_BP, 2);
         spi_write_reg16(CSR_CFG_V_ACT, 120);
-        spi_write_reg8(CSR_CFG_H_FP, 2);
+        spi_write_reg8(CSR_CFG_H_FP, 3);
         spi_write_reg8(CSR_CFG_H_SYNC, 1);
         spi_write_reg8(CSR_CFG_H_BP, 2);
         spi_write_reg16(CSR_CFG_H_ACT, 40);
@@ -100,7 +100,8 @@ void tick(void) {
         core->epd_sdle,
         core->epd_sdoe,
         core->epd_sd,
-        core->epd_sdce0
+        core->epd_sdce0,
+        core->dbg_wvfm_tgt
     );
     srcsim_apply(
         vin_vsync,

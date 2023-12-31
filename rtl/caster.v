@@ -53,7 +53,9 @@ module caster(
     input  wire         mig_error,
     input  wire         mif_error,
     output wire [23:0]  frame_bytes,
-    output wire         global_en
+    output wire         global_en,
+    // Debug output
+    output wire [15:0]  dbg_wvfm_tgt
     );
 
     parameter COLORMODE = "MONO";
@@ -427,6 +429,21 @@ module caster(
         .out(s2_pixel_ed1b_dithered)
     );
 
+    wire [15:0] s2_pixel_ed4b_dithered;
+    error_diffusion_dithering #(
+        .INPUT_BITS(8),
+        .OUTPUT_BITS(4),
+        .PIXEL_RATE(4)
+    ) ed4b_dithering (
+        .clk(clk),
+        .rst(rst),
+        .in(s2_pixel_linear),
+        .in_valid(s2_active),
+        .hsync(s1_hsync),
+        .vsync(scan_in_vsync),
+        .out(s2_pixel_ed4b_dithered)
+    );
+
     // Slice Y8 input downto Y4
     wire [15:0] s1_vin_pixel_y4 = {vin_pixel[31:28], vin_pixel[23:20],
             vin_pixel[15:12], vin_pixel[7:4]};
@@ -477,6 +494,7 @@ module caster(
                     wvfm_src_local_counter : wvfm_src_global_counter;
             wire [3:0] wvfm_tgt = wvfm_bi[3:0];
             assign ram_addr_rd[i] = {wvfm_fseq, wvfm_tgt, wvfm_src};
+            assign dbg_wvfm_tgt[i*4+:4] = wvfm_tgt;
         end
     endgenerate
 
@@ -510,12 +528,14 @@ module caster(
     reg [15:0] s3_vin_pixel;
     reg [15:0] s3_pixel_ordered_dithered;
     reg [3:0] s3_pixel_ed1b_dithered;
+    reg [15:0] s3_pixel_ed4b_dithered;
     reg [3:0] s3_op_valid;
     always @(posedge clk) begin
         s3_vin_pixel <= s2_vin_pixel;
         s3_bi_pixel <= s2_bi_pixel;
         s3_pixel_ordered_dithered <= s2_pixel_ordered_dithered;
         s3_pixel_ed1b_dithered <= s2_pixel_ed1b_dithered;
+        s3_pixel_ed4b_dithered <= s2_pixel_ed4b_dithered;
         s3_op_valid <= s2_op_valid;
     end
 
@@ -532,13 +552,13 @@ module caster(
     wire [3:0] al_diff_pixel;
     generate
         for (i = 0; i < 4; i = i + 1) begin: pix_proc
-            wire [3:0] proc_p_or = s3_vin_pixel[i*4+3 : i*4];
-            wire [3:0] proc_p_od = s3_pixel_ordered_dithered[i*4+3 : i*4];
+            wire [3:0] proc_p_or = s3_vin_pixel[i*4+:4];
+            wire [3:0] proc_p_od = s3_pixel_ordered_dithered[i*4+:4];
             wire [3:0] proc_p_e1 = {4{s3_pixel_ed1b_dithered[i]}};
-            wire [3:0] proc_p_e4 = 4'd0; // not implemented yet
-            wire [15:0] proc_bi = s3_bi_pixel[i*16+15 : i*16];
+            wire [3:0] proc_p_e4 = s3_pixel_ed4b_dithered[i*4+:4];
+            wire [15:0] proc_bi = s3_bi_pixel[i*16+:16];
             wire [15:0] proc_bo;
-            wire [1:0] proc_lut_rd = s3_lut_rd[i*2+1 : i*2];
+            wire [1:0] proc_lut_rd = s3_lut_rd[i*2+:2];
             wire [1:0] proc_output;
 
             pixel_processing pixel_processing(
@@ -561,8 +581,8 @@ module caster(
             );
 
             // Output
-            assign pixel_comb[i*2+1 : i*2] = frame_valid ? proc_output : 2'b00;
-            assign bo_pixel_comb[i*16+15 : i*16] = frame_valid ? proc_bo : proc_bi;
+            assign pixel_comb[i*2+:2] = frame_valid ? proc_output : 2'b00;
+            assign bo_pixel_comb[i*16+:16] = frame_valid ? proc_bo : proc_bi;
         end
     endgenerate
     assign al_diff = s4_active && (|al_diff_pixel);
