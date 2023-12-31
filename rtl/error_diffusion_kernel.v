@@ -78,9 +78,9 @@ module error_diffusion_kernel #(
             $signed(pix_adder) - $signed({2'b0, pix_qlinear});
 
     // Distribute error
-    wire [ERROR_BITS+4-1:0] err_r_mult = $signed(quant_err) * 7;
+    wire [ERROR_BITS+4-1:0] err_r_mult = $signed(quant_err) * 8;
     wire [ERROR_BITS+4-1:0] err_bl_mult = $signed(quant_err) * 3;
-    wire [ERROR_BITS+4-1:0] err_b_mult = $signed(quant_err) * 5;
+    wire [ERROR_BITS+4-1:0] err_b_mult = $signed(quant_err) * 4;
     wire [ERROR_BITS+4-1:0] err_br_mult = $signed(quant_err) * 1;
     // Divide only by 8 (instead of 16) to get 10p1 fixed point format
     wire [ERROR_BITS+1-1:0] err_r_div = err_r_mult[ERROR_BITS+4-1:3];
