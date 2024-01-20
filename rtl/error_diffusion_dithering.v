@@ -26,7 +26,7 @@ module error_diffusion_dithering #(
     input wire in_valid,
     input wire hsync,
     input wire vsync,
-    output reg [OUTPUT_BITS*PIXEL_RATE-1:0] out
+    output wire [OUTPUT_BITS*PIXEL_RATE-1:0] out
 );
 
     // Error uses 8p1 fixed point format, range -256 (-128) to 255 (127.5)
@@ -38,6 +38,7 @@ module error_diffusion_dithering #(
     // input/output shuffle
     wire [INPUT_BITS*PIXEL_RATE-1:0] in_r;
     wire [OUTPUT_BITS*PIXEL_RATE-1:0] out_r;
+    reg [INPUT_BITS*PIXEL_RATE-1:0] s1_in_r_reg;
 
     // error buffer (eb)
     wire [EB_ABITS-1:0] eb_rptr;
@@ -70,6 +71,9 @@ module error_diffusion_dithering #(
     // delayed by 2 clks
     reg s2_valid;
     reg [EB_ABITS-1:0] s2_x_counter;
+    // delayed by 3 clks
+    reg s3_valid;
+    reg [EB_ABITS-1:0] s3_x_counter;
     
     // The wb buffer functions like a shift register, for the first cycle only
     // 3 pixels are valid and for the last cycle only 1 pixel is valid. For all
@@ -83,6 +87,7 @@ module error_diffusion_dithering #(
 
     // Suppress error buffer for the first line (last line from previous frame)
     wire [ERROR_BITS*PIXEL_RATE-1:0] err_eb = first_line ? 'd0 : eb_rd;
+    reg [ERROR_BITS*PIXEL_RATE-1:0] s1_err_eb_reg;
 
     wire [EB_ABITS-1:0] x_counter_inc = x_counter + 'd1;
 
@@ -98,24 +103,30 @@ module error_diffusion_dithering #(
     wire [ERROR_BITS-1:0] err_b_next;
     wire [ERROR_BITS-1:0] err_br_next;
 
+    // For readability
+    `define CUR_PIX     i*ERROR_BITS+:ERROR_BITS
+    `define PREV_PIX    (i-1)*ERROR_BITS+:ERROR_BITS
+    `define LAST_PIX    (PIXEL_RATE-1)*ERROR_BITS+:ERROR_BITS
+
     genvar i;
     generate
         for (i = 0; i < PIXEL_RATE; i = i + 1) begin: gen_kernel
+            // This logic runs at 1 cycle later than input becomes valid
             error_diffusion_kernel #(
                 .INPUT_BITS(INPUT_BITS),
                 .OUTPUT_BITS(OUTPUT_BITS),
                 .ERROR_BITS(ERROR_BITS)
             ) kernel (
-                .pixel_in(in_r[i*INPUT_BITS+:INPUT_BITS]),
-                .err_line_buffer_in(err_eb[i*ERROR_BITS+:ERROR_BITS]),
-                .err_left_in((i == 0) ? err_r : err_r_out[(i-1)*ERROR_BITS+:ERROR_BITS]),
-                .err_bottom_left_in((i == 0) ? err_b : err_b_out[(i-1)*ERROR_BITS+:ERROR_BITS]),
-                .err_bottom_in((i == 0) ? err_br : err_br_out[(i-1)*ERROR_BITS+:ERROR_BITS]),
+                .pixel_in(s1_in_r_reg[i*INPUT_BITS+:INPUT_BITS]),
+                .err_line_buffer_in(s1_err_eb_reg[`CUR_PIX]),
+                .err_left_in((i == 0) ? err_r : err_r_out[`PREV_PIX]),
+                .err_bottom_left_in((i == 0) ? err_b : err_b_out[`PREV_PIX]),
+                .err_bottom_in((i == 0) ? err_br : err_br_out[`PREV_PIX]),
                 .pixel_out(quant_out[i*OUTPUT_BITS+:OUTPUT_BITS]),
-                .err_right_out(err_r_out[i*ERROR_BITS+:ERROR_BITS]),
-                .err_bottom_left_out(err_bl_out[i*ERROR_BITS+:ERROR_BITS]),
-                .err_bottom_out(err_b_out[i*ERROR_BITS+:ERROR_BITS]),
-                .err_bottom_right_out(err_br_out[i*ERROR_BITS+:ERROR_BITS])
+                .err_right_out(err_r_out[`CUR_PIX]),
+                .err_bottom_left_out(err_bl_out[`CUR_PIX]),
+                .err_bottom_out(err_b_out[`CUR_PIX]),
+                .err_bottom_right_out(err_br_out[`CUR_PIX])
             );
         end
     endgenerate
@@ -123,12 +134,12 @@ module error_diffusion_dithering #(
     // Assign register next value
     assign err_bl_next = {err_bl_out, err_bl[ERROR_BITS*PIXEL_RATE+:(PIXEL_RATE-1)*ERROR_BITS]};
     // For bl, other pixels output are assigned in the generate for loop
-    assign err_r_next = err_r_out[(PIXEL_RATE-1)*ERROR_BITS+:ERROR_BITS];
-    assign err_b_next = err_b_out[(PIXEL_RATE-1)*ERROR_BITS+:ERROR_BITS];
-    assign err_br_next = err_br_out[(PIXEL_RATE-1)*ERROR_BITS+:ERROR_BITS];
+    assign err_r_next = err_r_out[`LAST_PIX];
+    assign err_b_next = err_b_out[`LAST_PIX];
+    assign err_br_next = err_br_out[`LAST_PIX];
 
-    assign eb_we = s2_valid; // intentionally dropping 1st pixel
-    assign eb_wptr = s2_x_counter;
+    assign eb_we = s3_valid; // intentionally dropping 1st pixel/ cycle
+    assign eb_wptr = s3_x_counter;
     assign eb_wr = err_bl[ERROR_BITS*PIXEL_RATE-1:0];
 
     // Assign IO shuffle
@@ -138,6 +149,8 @@ module error_diffusion_dithering #(
         assign out_r[i*OUTPUT_BITS+:OUTPUT_BITS] =
                 quant_out[(PIXEL_RATE-1-i)*OUTPUT_BITS+:OUTPUT_BITS];
     end endgenerate
+
+    assign out = out_r; // Output is not bufferred
 
     // For debugging visibility
     // wire [ERROR_BITS-1:0] eb_wr_expanded [0:PIXEL_RATE-1];
@@ -177,6 +190,11 @@ module error_diffusion_dithering #(
         s1_x_counter <= x_counter;
         s2_valid <= s1_valid;
         s2_x_counter <= s1_x_counter;
+        s3_valid <= s2_valid;
+        s3_x_counter <= s2_x_counter;
+
+        s1_in_r_reg <= in_r;
+        s1_err_eb_reg <= err_eb;
 
         // Error buffers
         if (hsync) begin
@@ -192,12 +210,10 @@ module error_diffusion_dithering #(
             err_br <= err_br_next;
         end
 
-        // Output
-        out <= out_r;
-
         if (rst) begin
             s1_valid <= 1'b0;
             s2_valid <= 1'b0;
+            s1_err_eb_reg <= 'd0;
         end
     end
 
