@@ -158,7 +158,7 @@ module csr(
                 csr_ope <= 1'b1;
             end
             `CSR_CONTROL: begin
-                csr_ctrl_en <= 1'b1;
+                csr_ctrl_en <= spi_req_wdata[0];
             end
             `CSR_CFG_V_FP: csr_cfg_vfp <= spi_req_wdata;
             `CSR_CFG_V_SYNC: csr_cfg_vsync <= spi_req_wdata;
@@ -182,7 +182,20 @@ module csr(
             csr_lutframe <= 6'd38; // Needs to match default waveform
             csr_lutwe <= 1'b0;
             csr_ope <= 1'b0;
+            `ifdef CSR_SELFBOOT
+            csr_ctrl_en <= 1'b1;
+            csr_cfg_vfp <= `DEFAULT_VFP;
+            csr_cfg_vsync <= `DEFAULT_VSYNC;
+            csr_cfg_vbp <= `DEFAULT_VBP;
+            csr_cfg_vact <= `DEFAULT_VACT;
+            csr_cfg_hfp <= `DEFAULT_HFP;
+            csr_cfg_hsync <= `DEFAULT_HSYNC;
+            csr_cfg_hbp <= `DEFAULT_HBP;
+            csr_cfg_hact <= `DEFAULT_HACT;
+            csr_cfg_fbytes <= `DEFAULT_FBYTES;
+            `else
             csr_ctrl_en <= 1'b0;
+            `endif
         end
     end
 

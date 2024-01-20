@@ -12,6 +12,11 @@
 // Glider top-level
 `default_nettype none
 `timescale 1ns / 1ps
+
+//`define INPUT_DVI       // DVI input on Glider DVI input
+//`define INPUT_LVDS      // LVDS input on Glider Type-C input
+`define INPUT_INTERNAL	// Internal test feed
+
 module top(
     // Global clock input
     input wire CLK_IN,
@@ -44,13 +49,17 @@ module top(
     output wire EPD_SDOE,
     output wire [15:0] EPD_SD,
     output wire EPD_SDCE0,
-    // LVDS interface 
+`ifdef INPUT_LVDS
+    // LVDS interface
     input wire LVDS_ODD_CK_P,
     input wire LVDS_ODD_CK_N,
     input wire [2:0] LVDS_ODD_P,
     input wire [2:0] LVDS_ODD_N,
     input wire [2:0] LVDS_EVEN_P,
     input wire [2:0] LVDS_EVEN_N,
+`elsif INPUT_DVI
+    // TODO
+`endif
     // CSR interface
     input wire SPI_CS,
     input wire SPI_SCK,
@@ -65,26 +74,6 @@ module top(
     parameter CLK_SOURCE = "DCM"; // Possible values: DDR, FPD, DCM
     // Remember to change clock multiplier in DDR3 unit
     // 2 for DCM, 8 for FPD, 20 for DDR
-    
-    // Horizontal
-    // All numbers are divided by 2
-    parameter VIN_H_FP    = 32;  //Front porch
-    parameter VIN_H_SYNC  = 96;  //Sync
-    parameter VIN_H_BP    = 152; //Back porch
-    parameter VIN_H_ACT   = 800; //Active pixels
-    parameter EPDC_H_FP   = 120;
-    parameter EPDC_H_SYNC = 10;
-    parameter EPDC_H_BP   = 10;
-    parameter EPDC_H_ACT  = 400;
-    // Vertical
-    parameter VIN_V_FP    = 1;    //Front porch
-    parameter VIN_V_SYNC  = 3;    //Sync
-    parameter VIN_V_BP    = 46;   //Back porch
-    parameter VIN_V_ACT   = 1200; //Active lines
-    parameter EPDC_V_FP   = 45;
-    parameter EPDC_V_SYNC = 1;
-    parameter EPDC_V_BP   = 2;
-    parameter EPDC_V_ACT  = 1200;
 
     // System clocking
     wire clk_sys;
@@ -141,15 +130,30 @@ module top(
     end
     endgenerate*/
 
-    // Global frame trigger
+    // Global frame trigger & control
     wire b_trigger;
+    wire global_en;
+    wire [23:0] frame_bytes;
 
     // Video input
     (* KEEP = "TRUE" *) wire v_pclk;
     wire v_vs, v_hs, v_de;
     wire [15:0] v_pixel;
     
-    /*vin_internal #(
+    `ifdef INPUT_INTERNAL
+    // Set resolutions for internal video feed
+    // Horizontal
+    // All numbers are divided by 2
+    parameter VIN_H_FP    = 32;  //Front porch
+    parameter VIN_H_SYNC  = 96;  //Sync
+    parameter VIN_H_BP    = 152; //Back porch
+    parameter VIN_H_ACT   = 800; //Active pixels
+    // Vertical
+    parameter VIN_V_FP    = 1;    //Front porch
+    parameter VIN_V_SYNC  = 3;    //Sync
+    parameter VIN_V_BP    = 46;   //Back porch
+    parameter VIN_V_ACT   = 1200; //Active lines
+    vin_internal #(
         .H_FP(VIN_H_FP),
         .H_SYNC(VIN_H_SYNC),
         .H_BP(VIN_H_BP),
@@ -166,7 +170,8 @@ module top(
         .v_pclk(v_pclk),
         .v_de(v_de),
         .v_pixel(v_pixel)
-    );*/
+    );
+    `elsif INPUT_LVDS
     vin_fpdlink #(
         .COLORMODE(COLORMODE)
     ) vin_fpdlink(
@@ -184,6 +189,9 @@ module top(
         .v_de(v_de),
         .v_pixel(v_pixel)
     );
+    `elsif INPUT_DVI
+    
+    `endif
     
     // Generate 1/2 video clock
     (* KEEP = "TRUE" *) wire clk_epdc;
@@ -301,6 +309,7 @@ module top(
     );
 
     // VRAM interface
+    wire memif_enable;
     wire memif_trigger;
     wire pix_read_valid;
     wire pix_read_ready;
@@ -311,16 +320,14 @@ module top(
     
     wire memif_error;
 
-    memif #(
-        .MAX_ADDRESS(EPDC_H_ACT * 4 * EPDC_V_ACT * 2)
-    )
-    memif(
+    memif memif(
         // Clock and reset
         .clk(clk_mif),
         .rst(sys_rst),
-        // Sync
-        .enable(!ddr_calib_done),
+        // Control
+        .enable(memif_enable),
         .vsync(memif_trigger),
+        .frame_bytes(frame_bytes),
         // Pixel output interface
         .pix_read(pix_read),
         .pix_read_valid(pix_read_valid),
@@ -357,6 +364,12 @@ module top(
         .i(b_trigger),
         .clko(clk_mif),
         .o(memif_trigger)
+    );
+
+    dff_sync memif_en_sync (
+        .i(!ddr_calib_done && global_en),
+        .clko(clk_mif),
+        .o(memif_enable)
     );
 
     // VRAM FIFOs
@@ -456,17 +469,19 @@ module top(
     caster(
         .clk(clk_epdc),
         .rst(sys_rst),
-        .sys_ready(sys_ready),
+        // Video input
         .vin_vsync(vin_vsync),
         .vin_pixel(vin_pixel),
         .vin_valid(vin_valid),
         .vin_ready(vin_ready),
-        .b_trigger(b_trigger),
+        // Framebuffer input
         .bi_pixel(bi_pixel),
         .bi_valid(bi_valid),
         .bi_ready(bi_ready),
+        // Framebuffer output
         .bo_pixel(bo_pixel),
         .bo_valid(bo_valid),
+        // EPD signals
         .epd_gdoe(EPD_GDOE),
         .epd_gdclk(EPD_GDCLK),
         .epd_gdsp(EPD_GDSP),
@@ -475,14 +490,22 @@ module top(
         .epd_sdoe(EPD_SDOE),
         .epd_sd(EPD_SD[7:0]),
         .epd_sdce0(EPD_SDCE0),
+        // CSR interface
         .spi_cs(spi_cs),
         .spi_sck(spi_sck),
         .spi_mosi(spi_mosi),
-        .spi_miso(SPI_MISO)
+        .spi_miso(SPI_MISO),
+        // Control / status
+        .b_trigger(b_trigger),
+        .sys_ready(sys_ready),
+        .mig_error(mig_error),
+        .mif_error(memif_error),
+        .frame_bytes(frame_bytes),
+        .global_en(global_en)
     );
     
     // Debug
-    /*wire [35:0] chipscope_control0;
+    wire [35:0] chipscope_control0;
     
     chipscope_icon icon (
         .CONTROL0(chipscope_control0) // INOUT BUS [35:0]
@@ -493,13 +516,15 @@ module top(
         .CLK(clk_mif),
         .TRIG0({
             memif_error,
-            memif_data_valid,
+            1'b0,
             ddr_calib_done,
             pll_locked,
             sys_rst,
-            3'b0
+            EPD_GDCLK,
+            EPD_GDSP,
+            EPD_SDCE0
         })
-    );*/
+    );
     
     assign EPD_SD[15:8] = EPD_SD[7:0];
 

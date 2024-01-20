@@ -25,7 +25,6 @@ module caster(
     input  wire         vin_valid,
     output wire         vin_ready,
     // Framebuffer input
-    output wire         b_trigger, // Trigger VRAM operation
     // 16 bit per pixel for state
     input  wire [63:0]  bi_pixel,
     input  wire         bi_valid,
@@ -49,6 +48,7 @@ module caster(
     input  wire         spi_mosi,
     output wire         spi_miso,
     // Control / Status
+    output wire         b_trigger, // Trigger VRAM operation
     input  wire         sys_ready, // Power OK, DDR calibration done, etc.
     input  wire         mig_error,
     input  wire         mif_error,
@@ -62,6 +62,16 @@ module caster(
 
     // Screen timing
     parameter SIMULATION = "TRUE";
+    
+    // Default resolution
+    parameter V_FP = 8'd3; // Lines before sync with SDOE / GDOE low, GDSP high (inactive)
+    parameter V_SYNC = 8'd1; // Lines at sync with SDOE / GDOE high, GDSP low (active)
+    parameter V_BP = 8'd2; // Lines before data becomes active
+    parameter V_ACT = 12'd120;
+    parameter H_FP = 8'd2; // SDLE low (inactive), SDCE0 high (inactive), clock active
+    parameter H_SYNC = 8'd1; // SDLE high (active), SDCE0 high (inactive), GDCLK lags by 1 clock, clock active
+    parameter H_BP = 8'd2; // SDLE low (inactive), SDCE0 high (inactive), no clock
+    parameter H_ACT = 12'd40; // Active pixels / 4, SDCE0 low (active)
 
     // Output logic
     localparam SCAN_IDLE = 2'd0;
