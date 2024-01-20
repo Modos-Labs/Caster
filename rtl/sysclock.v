@@ -8,10 +8,11 @@
 // INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
 // PARTICULAR PURPOSE. Please see the CERN-OHL-P v2 for applicable conditions
 //
-// clocking.v
+// sysclock.v
 // Glider-specific clock generation
 `timescale 1ns / 1ps
-module clocking(
+
+module sysclock(
     // Clock in ports
     input  wire clk_in,
     // Clock out ports

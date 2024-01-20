@@ -19,7 +19,7 @@ module vin_internal(
     output reg          v_hsync, // active high
     output wire         v_pclk,
     output reg          v_de, // active high
-    output reg  [7:0]   v_pixel // 2 pixels per clock, Y4
+    output reg  [15:0]  v_pixel // 2 pixels per clock, Y8
 );
     
     // 33MHz to ~81MHz PLL (162MHz standard UXGA 60Hz timing)
@@ -151,14 +151,14 @@ module vin_internal(
     wire hs = ((h_count > H_FP) && (h_count <= H_FP + H_SYNC));
     wire vs = ((v_count > V_FP) && (v_count <= V_FP + V_SYNC));
     
-    wire [7:0] pixel = 
+    wire [15:0] pixel =
         (frame_count < 9'd120) ? (
-        ((x[0] ^ y[1]) ? 8'hFF : 8'h00)) : (
+        ((x[0] ^ y[1]) ? 16'hFFFF : 16'h0000)) : (
         (frame_count < 9'd240) ? (
-        ((x[1] ^ y[2]) ? 8'hFF : 8'h00)) : (
+        ((x[1] ^ y[2]) ? 16'hFFFF : 16'h0000)) : (
         (frame_count < 9'd360) ? (
-        ((x[2] ^ y[3]) ? 8'hFF : 8'h00)) : (
-        ((x[3] ^ y[4]) ? 8'hFF : 8'h00))));
+        ((x[2] ^ y[3]) ? 16'hFFFF : 16'h0000)) : (
+        ((x[3] ^ y[4]) ? 16'hFFFF : 16'h0000))));
     
     // Buffer signal through DFF
     always @(posedge v_pclk) begin
@@ -166,7 +166,7 @@ module vin_internal(
             v_hsync <= 1'b0;
             v_vsync <= 1'b0;
             v_de <= 1'b0;
-            v_pixel <= 8'h00;
+            v_pixel <= 16'h0000;
         end
         else begin
             v_hsync <= hs;

@@ -85,7 +85,7 @@ module top(
     /*generate
     if (CLK_SOURCE == "DCM") begin: clocking_dq*/
         wire pll_locked;
-        clocking clocking (
+        sysclock sysclock (
             .clk_in(CLK_IN),
             .clk_ddr(clk_ddr),
             .clk_sys(clk_sys),
