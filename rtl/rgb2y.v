@@ -16,7 +16,7 @@ module rgb2y(
     input wire [5:0] r,
     input wire [5:0] g,
     input wire [5:0] b,
-    output wire [5:0] y
+    output wire [7:0] y
     );
 
     // Pretty much overkill.
@@ -27,7 +27,7 @@ module rgb2y(
 
     wire [13:0] acc = r_mult + g_mult + b_mult;
 
-    assign y = acc[13:8];
+    assign y = acc[13:6];
 
 endmodule
 `default_nettype wire

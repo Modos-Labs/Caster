@@ -13,9 +13,9 @@
 `default_nettype none
 `timescale 1ns / 1ps
 
-//`define INPUT_DVI       // DVI input on Glider DVI input
+`define INPUT_DVI       // DVI input on Glider DVI input
 //`define INPUT_LVDS      // LVDS input on Glider Type-C input
-`define INPUT_INTERNAL	// Internal test feed
+//`define INPUT_INTERNAL	// Internal test feed
 
 module top(
     // Global clock input
@@ -58,7 +58,10 @@ module top(
     input wire [2:0] LVDS_EVEN_P,
     input wire [2:0] LVDS_EVEN_N,
 `elsif INPUT_DVI
-    // TODO
+    input wire DVI_CK_P,
+    input wire DVI_CK_N,
+    input wire [2:0] DVI_DAT_P,
+    input wire [2:0] DVI_DAT_N,
 `endif
     // CSR interface
     input wire SPI_CS,
@@ -92,18 +95,18 @@ module top(
             .reset(1'b0),
             .locked(pll_locked)
         );
-        reg [26:0] rst_counter;
-        always @(posedge clk_sys) begin
-            if (!pll_locked) begin
-                rst_counter <= 27'd0;
-            end
-            else begin
-                if (!rst_counter[26])
-                    rst_counter <= rst_counter + 1;
-            end
-        end
-        assign mif_rst = !rst_counter[26];
-        //assign mif_rst = !pll_locked;
+//         reg [26:0] rst_counter;
+//         always @(posedge clk_sys) begin
+//             if (!pll_locked) begin
+//                 rst_counter <= 27'd0;
+//             end
+//             else begin
+//                 if (!rst_counter[26])
+//                     rst_counter <= rst_counter + 1;
+//             end
+//         end
+//         assign mif_rst = !rst_counter[26];
+        assign mif_rst = !pll_locked;
     /*end
     else if (CLK_SOURCE == "DDR") begin: clocking_ddr
         reg c3_sys_rst = 1'b1;
@@ -190,7 +193,28 @@ module top(
         .v_pixel(v_pixel)
     );
     `elsif INPUT_DVI
-    
+    wire dbg_pclk;
+    wire dbg_hsync;
+    wire dbg_vsync;
+    wire dbg_de;
+    wire dbg_pll_lck;
+    vin_dvi vin_dvi (
+        .rst(sys_rst),
+        .dvi_cp(DVI_CK_P),
+        .dvi_cn(DVI_CK_N),
+        .dvi_dp(DVI_DAT_P),
+        .dvi_dn(DVI_DAT_N),
+        .v_vsync(v_vs),
+        .v_hsync(v_hs),
+        .v_pclk(v_pclk),
+        .v_de(v_de),
+        .v_pixel(v_pixel),
+        .dbg_pclk(dbg_pclk),
+        .dbg_hsync(dbg_hsync),
+        .dbg_vsync(dbg_vsync),
+        .dbg_de(dbg_de),
+        .dbg_pll_lck(dbg_pll_lck)
+    );
     `endif
     
     // Generate 1/2 video clock
@@ -367,7 +391,7 @@ module top(
     );
 
     dff_sync memif_en_sync (
-        .i(!ddr_calib_done && global_en),
+        .i(ddr_calib_done && global_en),
         .clko(clk_mif),
         .o(memif_enable)
     );
@@ -415,21 +439,6 @@ module top(
         .empty(bo_fifo_empty)
     );
     assign pix_write_valid = !bo_fifo_empty;
-
-    // Power controller
-    wire pok;
-    wire error;
-    
-    wire sys_rst_sync;
-    dff_sync pok_sync (
-        .i(sys_rst),
-        .clko(clk_sys),
-        .o(sys_rst_sync)
-    );
-
-    // TODO: Receive power info from SPI slave
-    assign pok = !sys_rst_sync;
-    assign error = 1'b0;
     
     // EPD controller
     wire epdc_ddr_calib_done;
@@ -438,7 +447,7 @@ module top(
         .clko(clk_epdc),
         .o(epdc_ddr_calib_done)
     );
-    wire sys_ready = pok && epdc_ddr_calib_done;
+    wire sys_ready = epdc_ddr_calib_done;
 
     wire spi_cs;
     wire spi_sck;
@@ -461,6 +470,10 @@ module top(
         .clko(clk_epdc),
         .o(spi_mosi)
     );
+    
+    wire [1:0] dbg_scan_state;
+    wire [10:0] dbg_scan_h_cnt;
+    wire [10:0] dbg_scan_v_cnt;
 
     caster #(
         .SIMULATION(SIMULATION),
@@ -491,9 +504,13 @@ module top(
         .epd_sd(EPD_SD[7:0]),
         .epd_sdce0(EPD_SDCE0),
         // CSR interface
-        .spi_cs(spi_cs),
-        .spi_sck(spi_sck),
-        .spi_mosi(spi_mosi),
+//        .spi_cs(spi_cs),
+//        .spi_sck(spi_sck),
+//        .spi_mosi(spi_mosi),
+//        .spi_miso(SPI_MISO),
+        .spi_cs(1'b1),
+        .spi_sck(1'b0),
+        .spi_mosi(1'b0),
         .spi_miso(SPI_MISO),
         // Control / status
         .b_trigger(b_trigger),
@@ -501,30 +518,58 @@ module top(
         .mig_error(mig_error),
         .mif_error(memif_error),
         .frame_bytes(frame_bytes),
-        .global_en(global_en)
+        .global_en(global_en),
+        // Debugging
+        .dbg_scan_state(dbg_scan_state),
+        .dbg_scan_h_cnt(dbg_scan_h_cnt),
+        .dbg_scan_v_cnt(dbg_scan_v_cnt)
     );
     
     // Debug
     wire [35:0] chipscope_control0;
-    
     chipscope_icon icon (
         .CONTROL0(chipscope_control0) // INOUT BUS [35:0]
     );
     
+    wire [31:0] ila_signals;
     chipscope_ila ila (
         .CONTROL(chipscope_control0), // INOUT BUS [35:0]
         .CLK(clk_mif),
-        .TRIG0({
-            memif_error,
-            1'b0,
-            ddr_calib_done,
-            pll_locked,
-            sys_rst,
-            EPD_GDCLK,
-            EPD_GDSP,
-            EPD_SDCE0
-        })
+        .TRIG0(ila_signals)
     );
+
+    assign ila_signals[0] = pll_locked;
+    assign ila_signals[1] = ddr_calib_done;
+    assign ila_signals[2] = sys_rst;
+    assign ila_signals[3] = memif_error;
+    assign ila_signals[4] = v_vs;
+    assign ila_signals[5] = v_hs;
+    assign ila_signals[6] = v_de;
+//    assign ila_signals[7] = v_pclk;
+//    assign ila_signals[8] = dbg_hsync;
+//    assign ila_signals[9] = dbg_vsync;
+//    assign ila_signals[10] = dbg_de;
+//    assign ila_signals[11] = dbg_pll_lck;
+    
+    assign ila_signals[7] = vin_ready; // vi_fifo_rd_en
+    assign ila_signals[8] = vin_valid; // vi_fifo_rd not empty
+    assign ila_signals[9] = memif_enable;
+    assign ila_signals[10] = memif_trigger;
+    assign ila_signals[11] = pix_read_valid; // bi_fifo_wr_en
+    assign ila_signals[12] = bi_fifo_full;
+    assign ila_signals[13] = bi_ready;
+    assign ila_signals[14] = bi_valid; // bi_fifo_rd not empty
+    assign ila_signals[15] = bo_valid;
+    assign ila_signals[16] = bo_fifo_full;
+    assign ila_signals[17] = pix_write_ready; // bo_fifo_rd_en
+    assign ila_signals[18] = bo_fifo_empty;
+    //assign ila_signals[19] = dbg_scan_state[0];
+    assign ila_signals[19] = dbg_scan_state[1];
+    //assign ila_signals[15] = vin_vsync;
+    assign ila_signals[20] = vin_pixel[15]; // sneak peak of pixel
+
+    
+    assign ila_signals[31:21] = dbg_scan_v_cnt;
     
     assign EPD_SD[15:8] = EPD_SD[7:0];
 

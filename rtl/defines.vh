@@ -58,12 +58,20 @@
 // Used for debugging purpose only
 `define CSR_SELFBOOT
 
-`define DEFAULT_VFP         8'd45
+// `define DEFAULT_VFP         8'd45
+// `define DEFAULT_VSYNC       8'd1
+// `define DEFAULT_VBP         8'd2
+// `define DEFAULT_VACT        12'd1200
+// `define DEFAULT_HFP         8'd16
+// `define DEFAULT_HSYNC       8'd2
+// `define DEFAULT_HBP         8'd2
+// `define DEFAULT_HACT        12'd400
+`define DEFAULT_VFP         8'd12
 `define DEFAULT_VSYNC       8'd1
-`define DEFAULT_VBP         8'd2
-`define DEFAULT_VACT        12'd1200
-`define DEFAULT_HFP         8'd120
-`define DEFAULT_HSYNC       8'd10
-`define DEFAULT_HBP         8'd10
-`define DEFAULT_HACT        12'd400
+`define DEFAULT_VBP         8'd3
+`define DEFAULT_VACT        12'd758
+`define DEFAULT_HFP         8'd72
+`define DEFAULT_HSYNC       8'd2
+`define DEFAULT_HBP         8'd2
+`define DEFAULT_HACT        12'd256
 `define DEFAULT_FBYTES      `DEFAULT_HACT * 4 * `DEFAULT_VACT * 2

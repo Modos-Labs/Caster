@@ -55,7 +55,10 @@ module caster(
     output wire [23:0]  frame_bytes,
     output wire         global_en,
     // Debug output
-    output wire [15:0]  dbg_wvfm_tgt
+    output wire [15:0]  dbg_wvfm_tgt,
+    output wire [1:0]   dbg_scan_state,
+    output wire [10:0]  dbg_scan_v_cnt,
+    output wire [10:0]  dbg_scan_h_cnt
     );
 
     parameter COLORMODE = "MONO";
@@ -439,8 +442,8 @@ module caster(
         .out(s2_pixel_ed1b_dithered)
     );
 
-    wire [15:0] s2_pixel_ed4b_dithered;
-    error_diffusion_dithering #(
+    wire [15:0] s2_pixel_ed4b_dithered = 'd0;
+    /*error_diffusion_dithering #(
         .INPUT_BITS(8),
         .OUTPUT_BITS(4),
         .PIXEL_RATE(4)
@@ -452,7 +455,7 @@ module caster(
         .hsync(s1_hsync),
         .vsync(scan_in_vsync),
         .out(s2_pixel_ed4b_dithered)
-    );
+    );*/
 
     // Slice Y8 input downto Y4
     wire [15:0] s1_vin_pixel_y4 = {vin_pixel[31:28], vin_pixel[23:20],
@@ -631,6 +634,10 @@ module caster(
     assign epd_sdclk = (scan_in_hfp || scan_in_hsync || scan_in_hact) ? ~clk : 1'b0;
 
     assign b_trigger = (scan_state == SCAN_WAITING);
+    
+    assign dbg_scan_state = scan_state;
+    assign dbg_scan_h_cnt = scan_h_cnt;
+    assign dbg_scan_v_cnt = scan_v_cnt;
 
 endmodule
 `default_nettype wire
