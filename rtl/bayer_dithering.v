@@ -14,7 +14,6 @@
 `default_nettype none
 module bayer_dithering (
     input wire        clk,
-    input wire        rst,
     input wire [31:0] vin,
     output reg [15:0] vout,
     input wire [2:0]  x_pos,

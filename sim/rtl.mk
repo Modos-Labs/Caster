@@ -17,7 +17,8 @@ else
 VERILATOR := $(VERILATOR_ROOT)/bin/verilator
 endif
 VFLAGS := -Wall -Wno-fatal -MMD --trace -cc \
-		-I../rtl
+		-I../rtl \
+		-Wno-PINCONNECTEMPTY
 ifeq ($(VERBOSE), 1)
 VFLAGS += +define+VERBOSE=1
 endif

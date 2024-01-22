@@ -14,17 +14,18 @@
 `default_nettype none
 module blue_noise_dithering (
     input wire        clk,
-    input wire        rst,
     input wire [31:0] vin,
     output reg [15:0] vout,
     input wire [3:0]  x_pos,
     input wire [5:0]  y_pos
 );
-    parameter COLORMODE = "DES";
 
     wire [15:0] vo_dithered;
     wire [7:0] b0, b1, b2, b3;
+    /* verilator lint_off UNUSEDSIGNAL */
+    // Lower 4 bits are not used
     wire [7:0] c0, c1, c2, c3;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     wire [9:0] addr_hi = {y_pos, x_pos};
 

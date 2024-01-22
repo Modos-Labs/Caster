@@ -1,4 +1,4 @@
-// Copyright Modos / Wenting Zhang 2023
+// Copyright Modos / Wenting Zhang 2024
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-P v2
 //
@@ -35,8 +35,10 @@ module error_diffusion_kernel #(
 );
 
     // Add input pixel with error
+    /* verilator lint_off UNUSEDSIGNAL */
     wire [ERROR_BITS+1-1:0] err_adder =
             $signed(err_left_in) + $signed(err_line_buffer_in);
+    /* verilator lint_on UNUSEDSIGNAL */
     wire [ERROR_BITS+1-1:0] pix_adder =
             $signed({{(ERROR_BITS-INPUT_BITS+1){1'b0}}, pixel_in}) +
             $signed(err_adder[ERROR_BITS+1-1:1]);
@@ -78,10 +80,12 @@ module error_diffusion_kernel #(
             $signed(pix_adder) - $signed({2'b0, pix_qlinear});
 
     // Distribute error
+    /* verilator lint_off UNUSEDSIGNAL */
     wire [ERROR_BITS+4-1:0] err_r_mult = $signed(quant_err) * 8;
     wire [ERROR_BITS+4-1:0] err_bl_mult = $signed(quant_err) * 3;
     wire [ERROR_BITS+4-1:0] err_b_mult = $signed(quant_err) * 4;
     wire [ERROR_BITS+4-1:0] err_br_mult = $signed(quant_err) * 1;
+    /* verilator lint_on UNUSEDSIGNAL */
     // Divide only by 8 (instead of 16) to get 10p1 fixed point format
     wire [ERROR_BITS+1-1:0] err_r_div = err_r_mult[ERROR_BITS+4-1:3];
     wire [ERROR_BITS+1-1:0] err_bl_div = err_bl_mult[ERROR_BITS+4-1:3];

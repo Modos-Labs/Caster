@@ -61,7 +61,10 @@ module caster(
     output wire [10:0]  dbg_scan_h_cnt
     );
 
+    /* verilator lint_off UNUSEDPARAM */
+    // Only used if bayer dithering is selected
     parameter COLORMODE = "MONO";
+    /* verilator lint_on UNUSEDPARAM */
 
     // Screen timing
     parameter SIMULATION = "TRUE";
@@ -71,7 +74,9 @@ module caster(
     localparam SCAN_WAITING = 2'd1;
     localparam SCAN_RUNNING = 2'd2;
 
+    /* verilator lint_off WIDTH */
     localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 255 : 2;
+    /* verilator lint_on WIDTH */
 
     // Internal design specific
     localparam VS_DELAY = 8; // wait 8 clocks after VS is vaild
@@ -357,6 +362,9 @@ module caster(
 
     // Image dithering
     wire [15:0] s2_pixel_ordered_dithered;
+
+    `ifndef USE_BLUE_NOISE
+    // Position for bayer dithering
     wire [2:0] x_pos;
     wire [2:0] y_pos;
 
@@ -397,6 +405,7 @@ module caster(
         assign y_pos = scan_v_cnt[2:0];
     end
     endgenerate
+    `endif
 
     // Degamma
     wire [31:0] s2_pixel_linear;
@@ -413,7 +422,6 @@ module caster(
     `ifdef USE_BLUE_NOISE
     blue_noise_dithering blue_noise_dithering (
         .clk(clk),
-        .rst(rst),
         .vin(s2_pixel_linear),
         .vout(s2_pixel_ordered_dithered),
         .x_pos(scan_h_cnt[3:0]),
@@ -424,7 +432,6 @@ module caster(
         .COLORMODE(COLORMODE)
     ) bayer_dithering (
         .clk(clk),
-        .rst(rst),
         .vin(s2_pixel_linear),
         .vout(s2_pixel_ordered_dithered),
         .x_pos(x_pos),
