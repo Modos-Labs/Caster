@@ -33,9 +33,9 @@ static int x_counter;
 static int y_counter;
 static int last_hs;
 
-#define USE_DBG_OUTPUT
+//#define USE_DBG_OUTPUT
 
-#define ACCEL 4
+#define ACCEL 20
 
 void render_copy(); // Function in main.cpp
 

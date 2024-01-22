@@ -76,6 +76,13 @@ void testmain(void) {
             step = 2;
         }
         break;
+    case 2:
+        if (tickcount > 200*1000) {
+            printf("Testing clearing\n");
+            intapi_redraw(40, 30, 120, 90);
+            step = 3;
+        }
+        break;
     // Do more test here
     }
 }

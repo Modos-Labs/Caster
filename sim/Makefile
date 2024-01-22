@@ -39,6 +39,7 @@ CSRCS +=
 CPPSRCS += \
 	./main.cpp \
 	./dispsim.cpp \
+	./intapi.cpp \
 	./spisim.cpp \
 	./srcsim.cpp \
 	./stb.cpp \

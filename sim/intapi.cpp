@@ -75,5 +75,5 @@ void intapi_setmode(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
     spi_write_reg16(CSR_OP_BOTTOM, y1);
     spi_write_reg8(CSR_OP_LENGTH, get_update_frames());
     spi_write_reg8(CSR_OP_PARAM, (uint8_t)mode);
-    spi_write_reg8(CSR_OP_CMD, OP_EXT_REDRAW);
+    spi_write_reg8(CSR_OP_CMD, OP_EXT_SETMODE);
 }

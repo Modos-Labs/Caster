@@ -155,6 +155,7 @@ module caster(
     reg [11:0] op_pending_top;
     reg [11:0] op_pending_bottom;
     reg [7:0] op_pending_param;
+    reg [7:0] op_pending_length;
     reg [7:0] op_pending_cmd;
 
     // During Vsync, it's then copied into register to be used by processing
@@ -164,6 +165,7 @@ module caster(
     reg [11:0] op_top;
     reg [11:0] op_bottom;
     reg [7:0] op_param;
+    reg [7:0] op_length;
     reg [7:0] op_cmd;
     always @(posedge clk) begin
         if (op_trigger && op_done) begin
@@ -173,6 +175,7 @@ module caster(
             op_top <= op_pending_top;
             op_bottom <= op_pending_bottom;
             op_param <= op_pending_param;
+            op_length <= op_pending_length;
             op_cmd <= op_pending_cmd;
             op_pending <= 1'b0;
         end
@@ -183,6 +186,7 @@ module caster(
             op_pending_top <= csr_optop;
             op_pending_bottom <= csr_opbottom;
             op_pending_param <= csr_opparam;
+            op_pending_length <= csr_oplength;
             op_pending_cmd <= csr_opcmd;
         end
         if (rst) begin
@@ -226,7 +230,7 @@ module caster(
                         op_state <= `OP_NORMAL;
                     end
                     else if (op_valid) begin
-                        op_framecnt <= csr_oplength;
+                        op_framecnt <= op_length;
                     end
                 end
                 else begin

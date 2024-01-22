@@ -115,8 +115,6 @@ module pixel_processing(
     // Specific to fast mono mode
     wire [5:0] pixel_framecnt_2w = FASTM_B2W_FRAMES - pixel_framecnt + 2;
     wire [5:0] pixel_framecnt_2b = FASTM_W2B_FRAMES - pixel_framecnt + 2;
-    wire [5:0] pixel_framecnt_back = FASTG_B2G_FRAMES - pixel_framecnt + 1;
-    wire [5:0] pixel_framecnt_oppo = FASTM_B2W_FRAMES - FASTG_B2G_FRAMES + pixel_framecnt;
 
     // Decode base mode and dither mode
     localparam BASEMODE_MANUAL_LUT = 2'b00;
@@ -130,12 +128,14 @@ module pixel_processing(
     localparam DITHER_ED_4BIT = 2'b11;
 
     //wire [15:0] initial_mode = {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0};
-    wire [15:0] initial_mode = {MODE_FAST_MONO_ORDERED, 2'b0, 6'd0, 3'd0, 1'b1};
+    //wire [15:0] initial_mode = {MODE_FAST_MONO_ORDERED, 2'b0, 6'd0, 3'd0, 1'b1};
+    wire [15:0] initial_mode = {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'd0, 2'b11};
 
     // EX op decoding sorta
     wire manual_lut_update_en = op_valid && (op_cmd == `OP_EXT_REDRAW);
     wire set_mode_en = op_valid && (op_cmd == `OP_EXT_SETMODE);
-    wire set_mode_clear = set_mode_en && (op_framecnt != 0);
+    wire clear_en = op_valid && (op_cmd == `OP_EXT_REDRAW);
+    wire force_clear = (set_mode_en && (op_framecnt != 0)) || clear_en;
     wire set_mode_apply = set_mode_en && (op_framecnt == 0);
 
     reg [1:0] pixel_basemode;
@@ -186,7 +186,13 @@ module pixel_processing(
         endcase
     end
 
-    wire [3:0] proc_vin = set_mode_clear ? 4'b11 :
+    wire [3:0] clear_color =
+        ((pixel_basemode == BASEMODE_AUTO_LUT) ||
+        (pixel_basemode == BASEMODE_MANUAL_LUT)) ? 4'hF :
+        ((op_framecnt[4:3] == 2'b11) ? 4'h0 :
+        (op_framecnt[5] ? 4'h0 : 4'hF));
+
+    wire [3:0] proc_vin = force_clear ? clear_color :
         (pixel_dither == DITHER_NONE) ? (proc_p_or) :
         (pixel_dither == DITHER_ORDERED) ? (proc_p_od) :
         (pixel_dither == DITHER_ED_1BIT) ? (proc_p_e1) : (proc_p_e4);
@@ -209,7 +215,7 @@ module pixel_processing(
             end
             else begin
                 proc_output = `NO_DRIVE; // TODO: Reduce this latency
-                if (manual_lut_update_en) begin
+                if (manual_lut_update_en || force_clear) begin
                     // Update requested, initiate update
                     proc_bo = {proc_bi[15:14], pixel_prev, csr_lutframe, proc_vin};
                 end
@@ -279,22 +285,22 @@ module pixel_processing(
                         proc_bo = proc_bi;
                     end
                     else begin
-                        // Hold mode, update status counter
-                        if (pixel_framecnt == 0) begin
-                            proc_bo =  (pixel_prev[1:0] == 2'b10) ? (
-                                    {proc_bi[15:12], STAGE_GREY, FASTG_W2G_FRAMES, proc_bi[3:0]}
-                                ) : (pixel_prev[1:0] == 2'b01) ? (
-                                    {proc_bi[15:12], STAGE_GREY, FASTG_B2G_FRAMES, proc_bi[3:0]}
-                                ) : (
-                                    {proc_bi[15:12], STAGE_DONE, 6'd0, 2'b00, proc_vin[3:2]}
-                                );
-                        end
-                        else begin
-                            proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
-                        end
+                    // Hold mode, update status counter
+                    if (pixel_framecnt == 0) begin
+                        proc_bo =  (pixel_prev[1:0] == 2'b10) ? (
+                                {proc_bi[15:12], STAGE_GREY, FASTG_W2G_FRAMES, proc_bi[3:0]}
+                            ) : (pixel_prev[1:0] == 2'b01) ? (
+                                {proc_bi[15:12], STAGE_GREY, FASTG_B2G_FRAMES, proc_bi[3:0]}
+                            ) : (
+                                {proc_bi[15:12], STAGE_DONE, 6'd0, 2'b00, proc_vin[3:2]}
+                            );
+                    end
+                    else begin
+                        proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
                     end
                 end
-                else begin
+            end
+            else begin
                     // Pixel state changed, start update
                     proc_output = drive_towards_input;
                     if (proc_vin[3]) begin
