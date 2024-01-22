@@ -14,7 +14,7 @@ Also checkout the [Glider](https://github.com/Modos-Labs/Glider), which is the r
 - Supports binary, 4-level grayscale, and 16-level grayscale output modes
 - Latency optimized binary and 4-level grayscale driving modes
 - Host software runtime controllable regional update and mode switching
-- Hardware bayer dithering and error-diffusion dithering with no additional latency
+- Hardware bayer dithering, blue-noise dithering, and error-diffusion dithering with no additional latency
 - Supports FPD-Link (LVDS), DVI, and MIPI-DSI input
 
 ## Driving Mechanism
@@ -122,3 +122,5 @@ The design, unless otherwise specified, is released under the CERN Open Source H
 Certain target specific IP cores including DDR memory controller, asynchronous FIFO, and PLL are provided by Xilinx and licensed sepearately with use of Xilinx tools. They are not covered under the CERN-OHL-P license.
 
 Simulation code are licensed under MIT.
+
+Provided blue noise texture is converted from http://momentsingraphics.de/BlueNoise.html, which is released in public domain.

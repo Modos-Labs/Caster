@@ -1,4 +1,4 @@
-// Copyright Modos / Wenting Zhang 2023
+// Copyright Modos / Wenting Zhang 2024
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-P v2
 //
@@ -129,7 +129,8 @@ module pixel_processing(
     localparam DITHER_ED_1BIT = 2'b10;
     localparam DITHER_ED_4BIT = 2'b11;
 
-    wire [15:0] initial_mode = {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0};
+    //wire [15:0] initial_mode = {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0};
+    wire [15:0] initial_mode = {MODE_FAST_MONO_ORDERED, 2'b0, 6'd0, 3'd0, 1'b1};
 
     // EX op decoding sorta
     wire manual_lut_update_en = op_valid && (op_cmd == `OP_EXT_REDRAW);

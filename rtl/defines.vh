@@ -56,7 +56,7 @@
 
 // Define this to enable operation by default after reset
 // Used for debugging purpose only
-`define CSR_SELFBOOT
+//`define CSR_SELFBOOT
 
 // `define DEFAULT_VFP         8'd45
 // `define DEFAULT_VSYNC       8'd1
@@ -75,3 +75,5 @@
 `define DEFAULT_HBP         8'd2
 `define DEFAULT_HACT        12'd256
 `define DEFAULT_FBYTES      `DEFAULT_HACT * 4 * `DEFAULT_VACT * 2
+
+`define USE_BLUE_NOISE  // Use blue noise instead of bayer

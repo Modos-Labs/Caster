@@ -1,4 +1,4 @@
-// Copyright Modos / Wenting Zhang 2023
+// Copyright Modos / Wenting Zhang 2024
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-P v2
 //
@@ -8,11 +8,11 @@
 // INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
 // PARTICULAR PURPOSE. Please see the CERN-OHL-P v2 for applicable conditions
 //
-// ordered_dithering.v
-// Ordered dithering implementation, 1 cycle latency
+// bayer_dithering.v
+// Bayer dithering implementation, 1 cycle latency
 `timescale 1ns / 1ps
 `default_nettype none
-module ordered_dithering (
+module bayer_dithering (
     input wire        clk,
     input wire        rst,
     input wire [31:0] vin,

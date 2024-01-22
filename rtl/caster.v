@@ -1,4 +1,4 @@
-// Copyright Modos / Wenting Zhang 2023
+// Copyright Modos / Wenting Zhang 2024
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-P v2
 //
@@ -406,9 +406,19 @@ module caster(
     endgenerate
 
     // Output dithered pixel 1 clock later
-    ordered_dithering #(
+    `ifdef USE_BLUE_NOISE
+    blue_noise_dithering blue_noise_dithering (
+        .clk(clk),
+        .rst(rst),
+        .vin(s2_pixel_linear),
+        .vout(s2_pixel_ordered_dithered),
+        .x_pos(scan_h_cnt[3:0]),
+        .y_pos(scan_v_cnt[5:0])
+    );
+    `else
+    bayer_dithering #(
         .COLORMODE(COLORMODE)
-    ) ordered_dithering (
+    ) bayer_dithering (
         .clk(clk),
         .rst(rst),
         .vin(s2_pixel_linear),
@@ -416,6 +426,7 @@ module caster(
         .x_pos(x_pos),
         .y_pos(y_pos)
     );
+    `endif
 
     wire [3:0] s2_pixel_ed1b_dithered;
     error_diffusion_dithering #(
