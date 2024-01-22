@@ -32,7 +32,7 @@ module error_diffusion_dithering #(
     // Error uses 8p1 fixed point format, range -256 (-128) to 255 (127.5)
     // Note to the 
     localparam ERROR_BITS = 9;
-    localparam EB_ABITS = 12 / PIXEL_RATE_LOG2;
+    localparam EB_ABITS = 12 - PIXEL_RATE_LOG2;
     localparam EB_DBITS = ERROR_BITS * PIXEL_RATE;
 
     // input/output shuffle
