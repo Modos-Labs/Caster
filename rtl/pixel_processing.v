@@ -276,15 +276,39 @@ module pixel_processing(
             end
         end
         BASEMODE_FAST_GREY: begin
-            if ((pixel_stage == STAGE_DONE) || (pixel_stage == STAGE_HOLD)) begin
-                // Currently not updating
-                if (proc_vin[3:2] == pixel_prev[1:0]) begin
-                    // Pixel state didn't change
-                    proc_output = `NO_DRIVE;
-                    if (pixel_stage == STAGE_DONE) begin
-                        proc_bo = proc_bi;
+            // Update strategy is similar in mono and hold stage (only binary)
+            if (pixel_stage == STAGE_MONO) begin
+                // Currently updating
+                proc_output = drive_towards_input;
+                if (proc_vin[3] != pixel_prev[1]) begin
+                    // Pixel state changed
+                    proc_bo = proc_vin[3] ? (
+                        {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2w, 2'b00, proc_vin[3:2]}
+                    ) : {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2b, 2'b00, proc_vin[3:2]};
+                end
+                else begin
+                    // Pixel didn't change, continue
+                    if (pixel_framecnt == 1) begin
+                        proc_bo = {proc_bi[15:12], STAGE_HOLD, FASTG_HOLDOFF_FRAMES, proc_bi[3:0]};
                     end
                     else begin
+                        proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+                    end
+                end
+            end
+            else if (pixel_stage == STAGE_HOLD) begin
+                // Not currently updating, holding
+                if (proc_vin[3] != pixel_prev[1]) begin
+                    // Pixel state changed
+                    proc_output = drive_towards_input;
+                    proc_bo = proc_vin[3] ? (
+                        {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, 2'b00, proc_vin[3:2]}
+                    ) : {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, 2'b00, proc_vin[3:2]};
+                end
+                else begin
+                    // Pixel state not changed
+                    proc_output = `NO_DRIVE;
+                    proc_bo = proc_bi;
                     // Hold mode, update status counter
                     if (pixel_framecnt == 0) begin
                         proc_bo =  (pixel_prev[1:0] == 2'b10) ? (
@@ -301,7 +325,9 @@ module pixel_processing(
                 end
             end
             else begin
-                    // Pixel state changed, start update
+                // Grey or done
+                if (proc_vin[3:2] != pixel_prev[1:0]) begin
+                    // Pixel changed
                     proc_output = drive_towards_input;
                     if (proc_vin[3]) begin
                         // White / light grey
@@ -324,38 +350,20 @@ module pixel_processing(
                             );
                     end
                 end
-            end
-            else if (pixel_stage == STAGE_MONO) begin
-                // Fast mono stage, always drive towards input
-                proc_output = drive_towards_input;
-                if (proc_vin[3:2] == pixel_prev[1:0]) begin
-                    // Pixel didn't change, continue
+                else if (pixel_stage == STAGE_GREY) begin
+                    // Keep driving grey
+                    proc_output = pixel_prev[1] ? `DRIVE_BLACK : `DRIVE_WHITE;
                     if (pixel_framecnt == 0) begin
-                        proc_bo = {proc_bi[15:12], STAGE_HOLD, FASTG_HOLDOFF_FRAMES, proc_bi[3:0]};
+                        proc_bo = {proc_bi[15:12], STAGE_DONE, 6'd0, proc_bi[3:0]};
                     end
                     else begin
                         proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
                     end
                 end
                 else begin
-                    if (proc_vin[3]) begin
-                        // White
-                        proc_bo = {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2w, 2'b00, proc_vin[3:2]};
-                    end
-                    else begin
-                        // Black
-                        proc_bo = {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2b, 2'b00, proc_vin[3:2]};
-                    end
-                end
-            end
-            else begin
-                // Grey stage, non cancellable, drive based on old value
-                proc_output = pixel_prev[1] ? `DRIVE_BLACK : `DRIVE_WHITE;
-                if (pixel_framecnt == 0) begin
-                    proc_bo = {proc_bi[15:12], STAGE_DONE, 6'd0, proc_bi[3:0]};
-                end
-                else begin
-                    proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+                    // Nothing to do, done
+                    proc_output = `NO_DRIVE;
+                    proc_bo = proc_bi;
                 end
             end
         end
