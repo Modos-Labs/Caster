@@ -131,7 +131,27 @@ module csr(
             {mig_error, mif_error, sys_ready, op_busy, op_queue, 2'd0, csr_ctrl_en} :
         8'd0;
 
-    always @(posedge clk) begin
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            csr_lutframe <= 6'd38; // Needs to match default waveform
+            csr_lutwe <= 1'b0;
+            csr_ope <= 1'b0;
+            `ifdef CSR_SELFBOOT
+            csr_ctrl_en <= 1'b1;
+            csr_cfg_vfp <= `DEFAULT_VFP;
+            csr_cfg_vsync <= `DEFAULT_VSYNC;
+            csr_cfg_vbp <= `DEFAULT_VBP;
+            csr_cfg_vact <= `DEFAULT_VACT;
+            csr_cfg_hfp <= `DEFAULT_HFP;
+            csr_cfg_hsync <= `DEFAULT_HSYNC;
+            csr_cfg_hbp <= `DEFAULT_HBP;
+            csr_cfg_hact <= `DEFAULT_HACT;
+            csr_cfg_fbytes <= `DEFAULT_FBYTES;
+            `else
+            csr_ctrl_en <= 1'b0;
+            `endif
+        end
+        else begin
         csr_lutwe <= 1'b0;
         csr_ope <= 1'b0;
         if (spi_req_wen) begin
@@ -178,24 +198,6 @@ module csr(
             end
             endcase
         end
-        if (rst) begin
-            csr_lutframe <= 6'd38; // Needs to match default waveform
-            csr_lutwe <= 1'b0;
-            csr_ope <= 1'b0;
-            `ifdef CSR_SELFBOOT
-            csr_ctrl_en <= 1'b1;
-            csr_cfg_vfp <= `DEFAULT_VFP;
-            csr_cfg_vsync <= `DEFAULT_VSYNC;
-            csr_cfg_vbp <= `DEFAULT_VBP;
-            csr_cfg_vact <= `DEFAULT_VACT;
-            csr_cfg_hfp <= `DEFAULT_HFP;
-            csr_cfg_hsync <= `DEFAULT_HSYNC;
-            csr_cfg_hbp <= `DEFAULT_HBP;
-            csr_cfg_hact <= `DEFAULT_HACT;
-            csr_cfg_fbytes <= `DEFAULT_FBYTES;
-            `else
-            csr_ctrl_en <= 1'b0;
-            `endif
         end
     end
 

@@ -14,6 +14,7 @@
 `default_nettype none
 module vin_dvi(
     input  wire         rst,
+    output wire         rst_out,
     input  wire         dvi_cp,
     input  wire         dvi_cn,
     input  wire [2:0]   dvi_dp,
@@ -32,7 +33,6 @@ module vin_dvi(
 
     wire pclk, hsync, vsync, de;
     wire [7:0] red, green, blue;
-    wire rst_out;
 
     dvi_serdes_in dvi_serdes_in(
         .rstin(rst),

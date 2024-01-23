@@ -361,9 +361,9 @@ module caster(
         s2_active <= s1_active;
 
     // Image dithering
-    wire [15:0] s2_pixel_ordered_dithered;
+    wire [15:0] s2_pixel_bayer_dithered;
+    wire [15:0] s2_pixel_bn_dithered;
 
-    `ifndef USE_BLUE_NOISE
     // Position for bayer dithering
     wire [2:0] x_pos;
     wire [2:0] y_pos;
@@ -405,7 +405,6 @@ module caster(
         assign y_pos = scan_v_cnt[2:0];
     end
     endgenerate
-    `endif
 
     // Degamma
     wire [31:0] s2_pixel_linear;
@@ -419,43 +418,26 @@ module caster(
     endgenerate
 
     // Output dithered pixel 1 clock later
-    `ifdef USE_BLUE_NOISE
     blue_noise_dithering blue_noise_dithering (
         .clk(clk),
         .vin(s2_pixel_linear),
-        .vout(s2_pixel_ordered_dithered),
+        .vout(s2_pixel_bn_dithered),
         .x_pos(scan_h_cnt[3:0]),
         .y_pos(scan_v_cnt[5:0])
     );
-    `else
+
     bayer_dithering #(
         .COLORMODE(COLORMODE)
     ) bayer_dithering (
         .clk(clk),
         .vin(s2_pixel_linear),
-        .vout(s2_pixel_ordered_dithered),
+        .vout(s2_pixel_bayer_dithered),
         .x_pos(x_pos),
         .y_pos(y_pos)
     );
-    `endif
 
-    wire [3:0] s2_pixel_ed1b_dithered;
+    wire [15:0] s2_pixel_ed4b_dithered;
     error_diffusion_dithering #(
-        .INPUT_BITS(8),
-        .OUTPUT_BITS(1),
-        .PIXEL_RATE(4)
-    ) ed1b_dithering (
-        .clk(clk),
-        .rst(rst),
-        .in(s2_pixel_linear),
-        .in_valid(s2_active),
-        .hsync(s1_hsync),
-        .vsync(scan_in_vsync),
-        .out(s2_pixel_ed1b_dithered)
-    );
-
-    wire [15:0] s2_pixel_ed4b_dithered = 'd0;
-    /*error_diffusion_dithering #(
         .INPUT_BITS(8),
         .OUTPUT_BITS(4),
         .PIXEL_RATE(4)
@@ -467,7 +449,7 @@ module caster(
         .hsync(s1_hsync),
         .vsync(scan_in_vsync),
         .out(s2_pixel_ed4b_dithered)
-    );*/
+    );
 
     // Slice Y8 input downto Y4
     wire [15:0] s1_vin_pixel_y4 = {vin_pixel[31:28], vin_pixel[23:20],
@@ -551,15 +533,15 @@ module caster(
 
     reg [63:0] s3_bi_pixel;
     reg [15:0] s3_vin_pixel;
-    reg [15:0] s3_pixel_ordered_dithered;
-    reg [3:0] s3_pixel_ed1b_dithered;
+    reg [15:0] s3_pixel_bayer_dithered;
+    reg [15:0] s3_pixel_bn_dithered;
     reg [15:0] s3_pixel_ed4b_dithered;
     reg [3:0] s3_op_valid;
     always @(posedge clk) begin
         s3_vin_pixel <= s2_vin_pixel;
         s3_bi_pixel <= s2_bi_pixel;
-        s3_pixel_ordered_dithered <= s2_pixel_ordered_dithered;
-        s3_pixel_ed1b_dithered <= s2_pixel_ed1b_dithered;
+        s3_pixel_bayer_dithered <= s2_pixel_bayer_dithered;
+        s3_pixel_bn_dithered <= s2_pixel_bn_dithered;
         s3_pixel_ed4b_dithered <= s2_pixel_ed4b_dithered;
         s3_op_valid <= s2_op_valid;
     end
@@ -578,8 +560,8 @@ module caster(
     generate
         for (i = 0; i < 4; i = i + 1) begin: pix_proc
             wire [3:0] proc_p_or = s3_vin_pixel[i*4+:4];
-            wire [3:0] proc_p_od = s3_pixel_ordered_dithered[i*4+:4];
-            wire [3:0] proc_p_e1 = {4{s3_pixel_ed1b_dithered[i]}};
+            wire [3:0] proc_p_bd = s3_pixel_bayer_dithered[i*4+:4];
+            wire [3:0] proc_p_nd = s3_pixel_bn_dithered[i*4+:4];
             wire [3:0] proc_p_e4 = s3_pixel_ed4b_dithered[i*4+:4];
             wire [15:0] proc_bi = s3_bi_pixel[i*16+:16];
             wire [15:0] proc_bo;
@@ -589,8 +571,8 @@ module caster(
             pixel_processing pixel_processing(
                 .csr_lutframe(csr_lutframe),
                 .proc_p_or(proc_p_or),
-                .proc_p_od(proc_p_od),
-                .proc_p_e1(proc_p_e1),
+                .proc_p_bd(proc_p_bd),
+                .proc_p_nd(proc_p_nd),
                 .proc_p_e4(proc_p_e4),
                 .proc_bi(proc_bi),
                 .proc_bo(proc_bo),

@@ -85,6 +85,8 @@ module top(
     wire clk_ddr;
     wire mif_rst;
     
+    wire epdc_rst;
+    
     /*generate
     if (CLK_SOURCE == "DCM") begin: clocking_dq*/
         wire pll_locked;
@@ -200,6 +202,7 @@ module top(
     wire dbg_pll_lck;
     vin_dvi vin_dvi (
         .rst(sys_rst),
+        .rst_out(epdc_rst),
         .dvi_cp(DVI_CK_P),
         .dvi_cn(DVI_CK_N),
         .dvi_dp(DVI_DAT_P),
@@ -449,15 +452,16 @@ module top(
     );
     wire sys_ready = epdc_ddr_calib_done;
 
-    wire spi_cs;
+    wire spi_ncs;
     wire spi_sck;
     wire spi_mosi;
     wire spi_miso;
     dff_sync spi_cs_sync (
-        .i(SPI_CS),
+        .i(!SPI_CS),
         .clko(clk_epdc),
-        .o(spi_cs)
+        .o(spi_ncs)
     );
+    wire spi_cs = !spi_ncs;
 
     dff_sync spi_sck_sync (
         .i(SPI_SCK),
@@ -481,7 +485,7 @@ module top(
     )
     caster(
         .clk(clk_epdc),
-        .rst(sys_rst),
+        .rst(epdc_rst),
         // Video input
         .vin_vsync(vin_vsync),
         .vin_pixel(vin_pixel),
@@ -504,13 +508,9 @@ module top(
         .epd_sd(EPD_SD[7:0]),
         .epd_sdce0(EPD_SDCE0),
         // CSR interface
-//        .spi_cs(spi_cs),
-//        .spi_sck(spi_sck),
-//        .spi_mosi(spi_mosi),
-//        .spi_miso(SPI_MISO),
-        .spi_cs(1'b1),
-        .spi_sck(1'b0),
-        .spi_mosi(1'b0),
+        .spi_cs(spi_cs),
+        .spi_sck(spi_sck),
+        .spi_mosi(spi_mosi),
         .spi_miso(SPI_MISO),
         // Control / status
         .b_trigger(b_trigger),
@@ -568,8 +568,12 @@ module top(
     //assign ila_signals[15] = vin_vsync;
     assign ila_signals[20] = vin_pixel[15]; // sneak peak of pixel
 
+    assign ila_signals[21] = spi_cs;
+    assign ila_signals[22] = spi_sck;
+    assign ila_signals[23] = spi_mosi;
     
-    assign ila_signals[31:21] = dbg_scan_v_cnt;
+    assign ila_signals[31:24] = dbg_scan_v_cnt[7:0];
+    //assign ila_signals[31:21] = dbg_scan_v_cnt;
     
     assign EPD_SD[15:8] = EPD_SD[7:0];
 
