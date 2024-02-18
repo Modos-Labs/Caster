@@ -67,7 +67,10 @@ void testmain(void) {
         spi_write_reg8(CSR_CFG_H_SYNC, 1);
         spi_write_reg8(CSR_CFG_H_BP, 2);
         spi_write_reg16(CSR_CFG_H_ACT, 40);
-        spi_write_reg8(CSR_CONTROL, 1); // Enable refresh
+        spi_write_reg8(CSR_CFG_DFRC, 1);
+        spi_write_reg8(CSR_ENABLE, 1); // Enable refresh
+        // Read back status
+        spi_write_reg8(CSR_STATUS, 0);
         step = 1;
         break;
     case 1:
@@ -77,11 +80,11 @@ void testmain(void) {
         }
         break;
     case 2:
-        if (tickcount > 200*1000) {
+        /*if (tickcount > 200*1000) {
             printf("Testing clearing\n");
             intapi_redraw(40, 30, 120, 90);
             step = 3;
-        }
+        }*/
         break;
     // Do more test here
     }

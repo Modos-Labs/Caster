@@ -34,6 +34,7 @@ module csr(
     output reg [7:0] csr_oplength,
     output reg [7:0] csr_opcmd,
     output reg csr_ope,
+    output reg csr_en,
     output reg [7:0] csr_cfg_vfp,
     output reg [7:0] csr_cfg_vsync,
     output reg [7:0] csr_cfg_vbp,
@@ -43,7 +44,7 @@ module csr(
     output reg [7:0] csr_cfg_hbp,
     output reg [11:0] csr_cfg_hact,
     output reg [23:0] csr_cfg_fbytes,
-    output reg csr_ctrl_en,
+    output reg [1:0] csr_cfg_dfrc,
     // Status input
     input wire sys_ready,
     input wire mig_error,
@@ -66,7 +67,7 @@ module csr(
     reg [7:0] spi_tx;
 
     wire [7:0] spi_rx_next = {spi_rx[6:0], spi_mosi};
-    
+
     reg [7:0] spi_req_addr;
     reg spi_req_ren;
     reg spi_req_wen;
@@ -127,8 +128,8 @@ module csr(
     end
 
     assign spi_req_rdata =
-        (spi_req_addr == `CSR_CONTROL) ?
-            {mig_error, mif_error, sys_ready, op_busy, op_queue, 2'd0, csr_ctrl_en} :
+        (spi_req_addr == `CSR_STATUS) ?
+            {mig_error, mif_error, sys_ready, op_busy, op_queue, 2'd0, csr_en} :
         8'd0;
 
     always @(posedge clk or posedge rst) begin
@@ -177,8 +178,8 @@ module csr(
                 csr_opcmd <= spi_req_wdata;
                 csr_ope <= 1'b1;
             end
-            `CSR_CONTROL: begin
-                csr_ctrl_en <= spi_req_wdata[0];
+            `CSR_ENABLE: begin
+                csr_en <= spi_req_wdata[0];
             end
             `CSR_CFG_V_FP: csr_cfg_vfp <= spi_req_wdata;
             `CSR_CFG_V_SYNC: csr_cfg_vsync <= spi_req_wdata;
@@ -193,11 +194,31 @@ module csr(
             `CSR_CFG_FBYTES_B2: csr_cfg_fbytes[23:16] <= spi_req_wdata;
             `CSR_CFG_FBYTES_B1: csr_cfg_fbytes[15:8] <= spi_req_wdata;
             `CSR_CFG_FBYTES_B0: csr_cfg_fbytes[7:0] <= spi_req_wdata;
+            `CSR_CFG_DFRC: csr_cfg_dfrc <= spi_req_wdata[1:0];
             default: begin
                 // no op
             end
             endcase
         end
+        if (rst) begin
+            csr_lutframe <= 6'd38; // Needs to match default waveform
+            csr_lutwe <= 1'b0;
+            csr_ope <= 1'b0;
+            `ifdef CSR_SELFBOOT
+            csr_en <= 1'b1;
+            csr_cfg_vfp <= `DEFAULT_VFP;
+            csr_cfg_vsync <= `DEFAULT_VSYNC;
+            csr_cfg_vbp <= `DEFAULT_VBP;
+            csr_cfg_vact <= `DEFAULT_VACT;
+            csr_cfg_hfp <= `DEFAULT_HFP;
+            csr_cfg_hsync <= `DEFAULT_HSYNC;
+            csr_cfg_hbp <= `DEFAULT_HBP;
+            csr_cfg_hact <= `DEFAULT_HACT;
+            csr_cfg_fbytes <= `DEFAULT_FBYTES;
+            csr_cfg_dfrc <= `DEFAULT_DFRC;
+            `else
+            csr_en <= 1'b0;
+            `endif
         end
     end
 

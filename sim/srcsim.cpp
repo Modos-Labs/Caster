@@ -63,7 +63,7 @@ static uint8_t rgb2y(uint32_t r, uint32_t g, uint32_t b, int x, int y) {
 }
 
 void srcsim_next_frame() {
-#if 0 // Bouncing box
+#if 1 // Bouncing box
     static int x = 0, y = 0;
     static int dir = 0;
     memset(pixels, 0xff, DISP_WIDTH * DISP_HEIGHT);
@@ -112,9 +112,32 @@ void srcsim_next_frame() {
         // Left up
         x--; y--;
     }
+
+    static bool image_loaded = false;
+    static uint8_t image[20*20];
+    if (!image_loaded) {
+        int x, y, n;
+        uint8_t *data = stbi_load("texture.jpg", &x, &y, &n, 0);
+        printf("Input image size %d x %d (%d channels)\n", x, y, n);
+        //uint8_t *scaled = (uint8_t *)calloc(1, 20 * 20 * n);
+        //stbir_resize_uint8(data, x, y, 0, scaled, 20, 20, 0, n);
+        //free(data);
+        //for (int i = 0; i < 20*20; i++) {
+        //    image[i] = scaled[i*n];
+        //}
+        //free(scaled);
+
+        for (int i = 0; i < 20*20; i++) {
+            image[i] = data[i*n];
+        }
+        image_loaded = true;
+        printf("Image loaded\n");
+    }
+
+    uint32_t rptr = 0;
     for (int i = y; i < y + 20; i++) {
         for (int j = x; j < x + 20; j++) {
-            pixels[i * DISP_WIDTH + j] = 0x00;
+            pixels[i * DISP_WIDTH + j] = image[rptr++];
         }
     }
     frame_counter++;
@@ -128,7 +151,7 @@ void srcsim_next_frame() {
         pixels[DISP_WIDTH * i] = 0x00;
         pixels[DISP_WIDTH * i + DISP_WIDTH - 1] = 0x00;
     }
-#elif 1 // Just full screen fixed color
+#elif 0 // Just full screen fixed color
     memset(pixels, 0x00, DISP_WIDTH * DISP_HEIGHT / 4);
     memset(pixels + DISP_WIDTH * DISP_HEIGHT / 4, 0x55, DISP_WIDTH * DISP_HEIGHT / 4);
     memset(pixels + DISP_WIDTH * DISP_HEIGHT / 2, 0xaa, DISP_WIDTH * DISP_HEIGHT / 4);
@@ -154,6 +177,15 @@ void srcsim_next_frame() {
     frame_counter++;
     if (frame_counter == 200)
         frame_counter = 0;
+#elif 0
+    if (frame_counter) {
+        memset(pixels, 0x00, DISP_WIDTH * DISP_HEIGHT);
+        frame_counter = 0;
+    }
+    else {
+        memset(pixels, 0xff, DISP_WIDTH * DISP_HEIGHT);
+        frame_counter = 1;
+    }
 #elif 0 // Image source
     if ((frame_counter % 100) != 0) {
         frame_counter++;

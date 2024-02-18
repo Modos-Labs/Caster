@@ -30,6 +30,7 @@
 static const int SPI_DIV = 10;
 static int spi_divider = 0;
 static uint8_t spi_tx;
+static uint8_t spi_rx;
 static int cs = 1;
 static int sck = 1;
 static int mosi = 1;
@@ -58,6 +59,9 @@ void spisim_apply(uint8_t &spi_cs, uint8_t &spi_sck, uint8_t &spi_mosi,
             // negedge
             sck = 0;
             if (bit_counter == 0) {
+                if (cs == 0) {
+                    printf("RX byte: %02x\n", spi_rx);
+                }
                 if (byte_buf.empty()) {
                     // Empty, stop
                     cs = 1;
@@ -84,6 +88,8 @@ void spisim_apply(uint8_t &spi_cs, uint8_t &spi_sck, uint8_t &spi_mosi,
         else {
             // posedge
             sck = 1;
+            spi_rx <<= 1;
+            spi_rx |= spi_miso & 0x1;
         }
     }
     spi_cs = cs;

@@ -15,6 +15,7 @@
 `include "defines.vh"
 module pixel_processing(
     input  wire [5:0]  csr_lutframe,// Total frames in LUT
+    input  wire [1:0]  csr_dfrc,    // Dynamic frame rate cap setting
     input  wire [3:0]  proc_p_or,   // Original pixel
     input  wire [3:0]  proc_p_bd,   // Bayer dithered pixel to 1/4-bit
     input  wire [3:0]  proc_p_nd,   // Blue noise dithered pixel to 1/4-bit
@@ -91,13 +92,14 @@ module pixel_processing(
     // In fast mono mode:
     // Bit 11-10: Reserved
     // Bit 9-4: Frame counter
-    // Bit 3-1: Must be 0
+    // Bit 3-2: Dynamic frame rate cap
+    // Bit 1: Reserved, keep at 0
     // Bit 0: Previous frame pixel value (0 black 1 white)
 
     // In fast grey 4-level mode:
     // Bit 11-10: Stage
     // Bit 9-4: Frame counter
-    // Bit 3-2: Must be 0
+    // Bit 3-2: Reserved, keep at 0
     // Bit 1-0: Previous frame pixel value
     // It matches, continue the current operation:
     localparam STAGE_DONE = 2'd0; // Screen already settled. No operation
@@ -112,7 +114,9 @@ module pixel_processing(
     wire [5:0] pixel_framecnt = proc_bi[9:4];
     wire [3:0] pixel_autolut_src = proc_bi[7:4];
     wire [3:0] pixel_prev = proc_bi[3:0];
+    wire [1:0] pixel_dfrc = proc_bi[3:2];
     wire [5:0] pixel_framecnt_dec = pixel_framecnt - 1;
+    wire [1:0] pixel_dfrc_dec = (pixel_dfrc != 2'd0) ? (pixel_dfrc - 2'd1) : 2'd0;
     // Specific to fast mono mode
     wire [5:0] pixel_framecnt_2w = FASTM_B2W_FRAMES - pixel_framecnt + 1;
     wire [5:0] pixel_framecnt_2b = FASTM_W2B_FRAMES - pixel_framecnt + 1;
@@ -129,7 +133,8 @@ module pixel_processing(
     localparam DITHER_ED_4BIT = 2'b11;
 
     //wire [15:0] initial_mode = {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0};
-    wire [15:0] initial_mode = {MODE_FAST_MONO_BAYER, 2'b0, 6'd0, 3'd0, 1'b1};
+    //wire [15:0] initial_mode = {MODE_FAST_MONO_ORDERED, 2'b0, 6'd0, 3'd0, 1'b1};
+    wire [15:0] initial_mode = {MODE_FAST_MONO_NO_DITHER, 2'b0, 6'd0, 3'd0, 1'b1};
     //wire [15:0] initial_mode = {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'd0, 2'b11};
 
     // EX op decoding sorta
@@ -255,17 +260,23 @@ module pixel_processing(
         end
         BASEMODE_FAST_MONO: begin
             if (pixel_framecnt != 0) begin
+                // Dynamic frame rate cap:
+                // Once the pixel state is changed, the DYFRC field is reset to
+                // the CSR val.
+                // The field value is then decremented every frame until 0
+                // Change to a new color is only allowed if the field is 0
                 // Currently updating
-                proc_output = drive_towards_input;
-                if (proc_vin[3] != pixel_prev[0]) begin
+                if ((proc_vin[3] != pixel_prev[0]) && (pixel_dfrc == 2'd0)) begin
                     // Pixel state changed
+                    proc_output = drive_towards_input;
                     proc_bo = proc_vin[3] ? (
-                        {proc_bi[15:10], pixel_framecnt_2w, 4'd1}
-                    ) : {proc_bi[15:10], pixel_framecnt_2b, 4'd0};
+                        {proc_bi[15:10], pixel_framecnt_2w, csr_dfrc, 2'd1}
+                    ) : {proc_bi[15:10], pixel_framecnt_2b, csr_dfrc, 2'd0};
                 end
                 else begin
                     // Pixel state not changed
-                    proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+                    proc_output = pixel_prev[0] ? `DRIVE_WHITE : `DRIVE_BLACK;
+                    proc_bo = {proc_bi[15:10], pixel_framecnt_dec, pixel_dfrc_dec, proc_bi[1:0]};
                 end
             end
             else begin
@@ -274,8 +285,8 @@ module pixel_processing(
                     // Pixel state changed
                     proc_output = drive_towards_input;
                     proc_bo = proc_vin[3] ? (
-                        {proc_bi[15:10], FASTM_B2W_FRAMES, 4'd1}
-                    ) : {proc_bi[15:10], FASTM_W2B_FRAMES, 4'd0};
+                        {proc_bi[15:10], FASTM_B2W_FRAMES, csr_dfrc, 2'd1}
+                    ) : {proc_bi[15:10], FASTM_W2B_FRAMES, csr_dfrc, 2'd0};
                 end
                 else begin
                     // Pixel state not changed

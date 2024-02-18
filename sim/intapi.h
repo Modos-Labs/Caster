@@ -38,7 +38,7 @@
 #define CSR_OP_PARAM        12
 #define CSR_OP_LENGTH       13
 #define CSR_OP_CMD          14
-#define CSR_CONTROL         15
+#define CSR_ENABLE          15
 #define CSR_CFG_V_FP        16
 #define CSR_CFG_V_SYNC      17
 #define CSR_CFG_V_BP        18
@@ -52,6 +52,8 @@
 #define CSR_CFG_FBYTES_B2   27
 #define CSR_CFG_FBYTES_B1   28
 #define CSR_CFG_FBYTES_B0   29
+#define CSR_CFG_DFRC        30
+#define CSR_STATUS          128
 // Alias for 16bit registers
 #define CSR_LUT_ADDR        CSR_LUT_ADDR_HI
 #define CSR_OP_LEFT         CSR_OP_LEFT_HI
