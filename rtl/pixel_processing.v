@@ -15,7 +15,7 @@
 `include "defines.vh"
 module pixel_processing(
     input  wire [5:0]  csr_lutframe,// Total frames in LUT
-    input  wire [1:0]  csr_dfrc,    // Dynamic frame rate cap setting
+    input  wire [1:0]  csr_mindrv,    // Dynamic frame rate cap setting
     input  wire [3:0]  proc_p_or,   // Original pixel
     input  wire [3:0]  proc_p_bd,   // Bayer dithered pixel to 1/4-bit
     input  wire [3:0]  proc_p_nd,   // Blue noise dithered pixel to 1/4-bit
@@ -114,9 +114,9 @@ module pixel_processing(
     wire [5:0] pixel_framecnt = proc_bi[9:4];
     wire [3:0] pixel_autolut_src = proc_bi[7:4];
     wire [3:0] pixel_prev = proc_bi[3:0];
-    wire [1:0] pixel_dfrc = proc_bi[3:2];
+    wire [1:0] pixel_mindrv = proc_bi[3:2];
     wire [5:0] pixel_framecnt_dec = pixel_framecnt - 1;
-    wire [1:0] pixel_dfrc_dec = (pixel_dfrc != 2'd0) ? (pixel_dfrc - 2'd1) : 2'd0;
+    wire [1:0] pixel_mindrv_dec = (pixel_mindrv != 2'd0) ? (pixel_mindrv - 2'd1) : 2'd0;
     // Specific to fast mono mode
     wire [5:0] pixel_framecnt_2w = FASTM_B2W_FRAMES - pixel_framecnt + 1;
     wire [5:0] pixel_framecnt_2b = FASTM_W2B_FRAMES - pixel_framecnt + 1;
@@ -266,17 +266,17 @@ module pixel_processing(
                 // The field value is then decremented every frame until 0
                 // Change to a new color is only allowed if the field is 0
                 // Currently updating
-                if ((proc_vin[3] != pixel_prev[0]) && (pixel_dfrc == 2'd0)) begin
+                if ((proc_vin[3] != pixel_prev[0]) && (pixel_mindrv == 2'd0)) begin
                     // Pixel state changed
                     proc_output = drive_towards_input;
                     proc_bo = proc_vin[3] ? (
-                        {proc_bi[15:10], pixel_framecnt_2w, csr_dfrc, 2'd1}
-                    ) : {proc_bi[15:10], pixel_framecnt_2b, csr_dfrc, 2'd0};
+                        {proc_bi[15:10], pixel_framecnt_2w, csr_mindrv, 2'd1}
+                    ) : {proc_bi[15:10], pixel_framecnt_2b, csr_mindrv, 2'd0};
                 end
                 else begin
                     // Pixel state not changed
                     proc_output = pixel_prev[0] ? `DRIVE_WHITE : `DRIVE_BLACK;
-                    proc_bo = {proc_bi[15:10], pixel_framecnt_dec, pixel_dfrc_dec, proc_bi[1:0]};
+                    proc_bo = {proc_bi[15:10], pixel_framecnt_dec, pixel_mindrv_dec, proc_bi[1:0]};
                 end
             end
             else begin
@@ -285,8 +285,8 @@ module pixel_processing(
                     // Pixel state changed
                     proc_output = drive_towards_input;
                     proc_bo = proc_vin[3] ? (
-                        {proc_bi[15:10], FASTM_B2W_FRAMES, csr_dfrc, 2'd1}
-                    ) : {proc_bi[15:10], FASTM_W2B_FRAMES, csr_dfrc, 2'd0};
+                        {proc_bi[15:10], FASTM_B2W_FRAMES, csr_mindrv, 2'd1}
+                    ) : {proc_bi[15:10], FASTM_W2B_FRAMES, csr_mindrv, 2'd0};
                 end
                 else begin
                     // Pixel state not changed

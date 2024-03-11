@@ -87,7 +87,7 @@ module caster(
     wire [11:0] csr_lutaddr;
     wire [7:0] csr_lutwr;
     wire csr_lutwe;
-    wire [1:0] csr_dfrc;
+    wire [1:0] csr_mindrv;
     wire [11:0] csr_opleft;
     wire [11:0] csr_opright;
     wire [11:0] csr_optop;
@@ -133,7 +133,7 @@ module caster(
         .csr_cfg_hbp(hbp),
         .csr_cfg_hact(hact),
         .csr_cfg_fbytes(frame_bytes),
-        .csr_cfg_dfrc(csr_dfrc),
+        .csr_cfg_mindrv(csr_mindrv),
         // Status input
         .sys_ready(sys_ready),
         .mig_error(mig_error),
@@ -572,7 +572,7 @@ module caster(
 
             pixel_processing pixel_processing(
                 .csr_lutframe(csr_lutframe),
-                .csr_dfrc(csr_dfrc),
+                .csr_mindrv(csr_mindrv),
                 .proc_p_or(proc_p_or),
                 .proc_p_bd(proc_p_bd),
                 .proc_p_nd(proc_p_nd),

@@ -32,7 +32,7 @@
 `define CSR_CFG_FBYTES_B2   8'd27
 `define CSR_CFG_FBYTES_B1   8'd28
 `define CSR_CFG_FBYTES_B0   8'd29
-`define CSR_CFG_DFRC        8'd30
+`define CSR_CFG_MINDRV        8'd30
 `define CSR_STATUS          8'd128
 
 // FB operations
@@ -77,6 +77,6 @@
 //`define DEFAULT_HBP         8'd2
 //`define DEFAULT_HACT        12'd256
 `define DEFAULT_FBYTES      `DEFAULT_HACT * 4 * `DEFAULT_VACT * 2
-`define DEFAULT_DFRC        2'd2
+`define DEFAULT_MINDRV        2'd2
 
 //`define USE_BLUE_NOISE  // Use blue noise instead of bayer

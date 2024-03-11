@@ -67,7 +67,7 @@ void testmain(void) {
         spi_write_reg8(CSR_CFG_H_SYNC, 1);
         spi_write_reg8(CSR_CFG_H_BP, 2);
         spi_write_reg16(CSR_CFG_H_ACT, 40);
-        spi_write_reg8(CSR_CFG_DFRC, 1);
+        spi_write_reg8(CSR_CFG_MINDRV, 1);
         spi_write_reg8(CSR_ENABLE, 1); // Enable refresh
         // Read back status
         spi_write_reg8(CSR_STATUS, 0);

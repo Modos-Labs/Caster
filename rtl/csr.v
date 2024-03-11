@@ -44,7 +44,7 @@ module csr(
     output reg [7:0] csr_cfg_hbp,
     output reg [11:0] csr_cfg_hact,
     output reg [23:0] csr_cfg_fbytes,
-    output reg [1:0] csr_cfg_dfrc,
+    output reg [1:0] csr_cfg_mindrv,
     // Status input
     input wire sys_ready,
     input wire mig_error,
@@ -194,7 +194,7 @@ module csr(
             `CSR_CFG_FBYTES_B2: csr_cfg_fbytes[23:16] <= spi_req_wdata;
             `CSR_CFG_FBYTES_B1: csr_cfg_fbytes[15:8] <= spi_req_wdata;
             `CSR_CFG_FBYTES_B0: csr_cfg_fbytes[7:0] <= spi_req_wdata;
-            `CSR_CFG_DFRC: csr_cfg_dfrc <= spi_req_wdata[1:0];
+            `CSR_CFG_MINDRV: csr_cfg_mindrv <= spi_req_wdata[1:0];
             default: begin
                 // no op
             end
@@ -215,7 +215,7 @@ module csr(
             csr_cfg_hbp <= `DEFAULT_HBP;
             csr_cfg_hact <= `DEFAULT_HACT;
             csr_cfg_fbytes <= `DEFAULT_FBYTES;
-            csr_cfg_dfrc <= `DEFAULT_DFRC;
+            csr_cfg_mindrv <= `DEFAULT_MINDRV;
             `else
             csr_en <= 1'b0;
             `endif
