@@ -241,7 +241,13 @@ module pixel_processing(
         end
         BASEMODE_AUTO_LUT: begin
             if (al_framecnt != 0) begin
-                // Update in progress
+                // Update in progress, ignore same color update
+                if (pixel_autolut_src == pixel_prev) begin
+                    proc_output = `NO_DRIVE;
+                end
+                else begin
+                    proc_output = proc_lut_rd;
+                end
                 proc_output = proc_lut_rd;
                 if (al_framecnt == 1) begin
                     // Last frame, copy destination value to source value
