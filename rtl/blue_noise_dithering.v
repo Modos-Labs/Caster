@@ -12,17 +12,23 @@
 // Blue noise dithering implementation, 1 cycle latency
 `timescale 1ns / 1ps
 `default_nettype none
-module blue_noise_dithering (
-    input wire        clk,
-    input wire [31:0] vin,
-    output reg [15:0] vout,
-    input wire [3:0]  x_pos,
-    input wire [5:0]  y_pos
+module blue_noise_dithering #(
+    parameter OUTPUT_BITS = 1 // 1 or 4
+) (
+    input wire                      clk,
+    input wire [31:0]               vin,
+    output reg [OUTPUT_BITS*4-1:0]  vout,
+    input wire [3:0]                x_pos,
+    input wire [5:0]                y_pos
 );
 
-    wire [15:0] vo_dithered;
-    wire [7:0] b0, b1, b2, b3;
+    // Noise attenuation, in bits
+    localparam NOISE_ATTEN = (OUTPUT_BITS == 1) ? 'd0 : 'd4;
+
+    wire [OUTPUT_BITS*4-1:0] vo_dithered;
     /* verilator lint_off UNUSEDSIGNAL */
+    // Lower 4 bits are not used in 4bpp mode
+    wire [7:0] b0, b1, b2, b3;
     // Lower 4 bits are not used
     wire [7:0] c0, c1, c2, c3;
     /* verilator lint_on UNUSEDSIGNAL */
@@ -70,11 +76,16 @@ module blue_noise_dithering (
     wire [7:0] a2 = vin[15:8];
     wire [7:0] a3 = vin[7:0];
 
-    adder_sat_8 adder_sat0 (a0, b0, c0);
-    adder_sat_8 adder_sat1 (a1, b1, c1);
-    adder_sat_8 adder_sat2 (a2, b2, c2);
-    adder_sat_8 adder_sat3 (a3, b3, c3);
-    assign vo_dithered = {c0[7:4], c1[7:4], c2[7:4], c3[7:4]};
+    adder_sat_8 adder_sat0 (a0, {{NOISE_ATTEN{1'd0}}, b0[7:NOISE_ATTEN]}, c0);
+    adder_sat_8 adder_sat1 (a1, {{NOISE_ATTEN{1'd0}}, b1[7:NOISE_ATTEN]}, c1);
+    adder_sat_8 adder_sat2 (a2, {{NOISE_ATTEN{1'd0}}, b2[7:NOISE_ATTEN]}, c2);
+    adder_sat_8 adder_sat3 (a3, {{NOISE_ATTEN{1'd0}}, b3[7:NOISE_ATTEN]}, c3);
+    assign vo_dithered = {
+        c0[7-:OUTPUT_BITS],
+        c1[7-:OUTPUT_BITS],
+        c2[7-:OUTPUT_BITS],
+        c3[7-:OUTPUT_BITS]
+    };
 
     always @(posedge clk) begin
         vout <= vo_dithered;

@@ -17,8 +17,9 @@ module pixel_processing(
     input  wire [5:0]  csr_lutframe,// Total frames in LUT
     input  wire [1:0]  csr_mindrv,    // Dynamic frame rate cap setting
     input  wire [3:0]  proc_p_or,   // Original pixel
-    input  wire [3:0]  proc_p_bd,   // Bayer dithered pixel to 1/4-bit
-    input  wire [3:0]  proc_p_nd,   // Blue noise dithered pixel to 1/4-bit
+    input  wire        proc_p_bd,   // Bayer dithered pixel to 1-bit
+    input  wire        proc_p_n1,   // Blue noise dithered pixel to 1-bit
+    input  wire [3:0]  proc_p_n4,   // Blue noise dithered pixel to 4-bit
     input  wire [3:0]  proc_p_e4,   // Error diffusion dithered pixel to 4-bit
     input  wire [15:0] proc_bi,     // Pixel state input from VRAM
     output reg  [15:0] proc_bo,     // Pixel state output to VRAM
@@ -43,7 +44,7 @@ module pixel_processing(
     localparam MODE_FAST_MONO_BLUE_NOISE = 4'd10; // 1010
     localparam MODE_FAST_GREY = 4'd11; // 1011
     localparam MODE_AUTO_LUT_NO_DITHER = 4'd12; // 1100
-    localparam MODE_AUTO_LUT_ERROR_DIFFUSION = 4'd13; // 1101
+    localparam MODE_AUTO_LUT_BLUE_NOISE = 4'd13; // 1101
 
     localparam FASTM_B2W_FRAMES = 6'd9;
     localparam FASTM_W2B_FRAMES = 6'd9;
@@ -55,10 +56,6 @@ module pixel_processing(
     localparam FASTG_B2G_FRAMES = 6'd1;
     localparam FASTG_W2G_FRAMES = 6'd1;
     localparam FASTG_SETTLE_FRAMES = 6'd5;
-    localparam FASTG_LG2B_FRAMES = 6'd8;
-    localparam FASTG_DG2B_FRAMES = 6'd5;
-    localparam FASTG_LG2W_FRAMES = 6'd5;
-    localparam FASTG_DG2W_FRAMES = 6'd8;
 
     // In auto LUT mode:
     // Bit 11-8: Reserved
@@ -76,6 +73,10 @@ module pixel_processing(
     // value is compared. If doesn't match, a flag is output to the external
     // logic for determining the region of update. The destination pixel value
     // is always updated.
+    // In auto LUT modes, same color update is ignored (does not trigger the
+    // clearing process). As a result ghosting could be bad and user will need
+    // to use clear button to manually clear the screen. It does avoid the
+    // flashing caused by tiny changes on the screen.
 
     // In manual LUT mode:
     // Bit 13-10: Source pixel value
@@ -127,15 +128,11 @@ module pixel_processing(
     localparam BASEMODE_FAST_GREY = 2'b10;
     localparam BASEMODE_AUTO_LUT = 2'b11;
 
-    localparam DITHER_NONE = 2'b00;
-    localparam DITHER_BAYER = 2'b01;
-    localparam DITHER_BLUENOISE = 2'b10;
-    localparam DITHER_ED_4BIT = 2'b11;
-
-    //wire [15:0] initial_mode = {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0};
-    //wire [15:0] initial_mode = {MODE_FAST_MONO_ORDERED, 2'b0, 6'd0, 3'd0, 1'b1};
-    wire [15:0] initial_mode = {MODE_FAST_MONO_NO_DITHER, 2'b0, 6'd0, 3'd0, 1'b1};
-    //wire [15:0] initial_mode = {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'd0, 2'b11};
+    localparam DITHER_NONE = 3'b000;
+    localparam DITHER_BAYER = 3'b001;
+    localparam DITHER_BN_1BIT = 3'b010;
+    localparam DITHER_BN_4BIT = 3'b011;
+    localparam DITHER_ED_4BIT = 3'b100;
 
     // EX op decoding sorta
     wire manual_lut_update_en = op_valid && (op_cmd == `OP_EXT_REDRAW);
@@ -145,7 +142,7 @@ module pixel_processing(
     wire set_mode_apply = set_mode_en && (op_framecnt == 0);
 
     reg [1:0] pixel_basemode;
-    reg [1:0] pixel_dither;
+    reg [2:0] pixel_dither;
     always @(*) begin
         case (pixel_mode_hi)
         MODE_MANUAL_LUT_NO_DITHER: begin
@@ -168,7 +165,7 @@ module pixel_processing(
             end
             MODE_FAST_MONO_BLUE_NOISE: begin
                 pixel_basemode = BASEMODE_FAST_MONO;
-                pixel_dither = DITHER_BLUENOISE;
+                pixel_dither = DITHER_BN_1BIT;
             end
             MODE_FAST_GREY: begin
                 pixel_basemode = BASEMODE_FAST_GREY;
@@ -178,9 +175,9 @@ module pixel_processing(
                 pixel_basemode = BASEMODE_AUTO_LUT;
                 pixel_dither = DITHER_NONE;
             end
-            MODE_AUTO_LUT_ERROR_DIFFUSION: begin
+            MODE_AUTO_LUT_BLUE_NOISE: begin
                 pixel_basemode = BASEMODE_AUTO_LUT;
-                pixel_dither = DITHER_ED_4BIT;
+                pixel_dither = DITHER_BN_4BIT;
             end
             default: begin
                 // Fallback, todo: report this as an error
@@ -208,8 +205,9 @@ module pixel_processing(
     wire [3:0] proc_vin = force_clear ? clear_color :
         (pixel_basemode == BASEMODE_FAST_GREY) ? (proc_p_li[7:4]) :
         (pixel_dither == DITHER_NONE) ? (proc_p_or) :
-        (pixel_dither == DITHER_BAYER) ? (proc_p_bd) :
-        (pixel_dither == DITHER_BLUENOISE) ? (proc_p_nd) : (proc_p_e4);
+        (pixel_dither == DITHER_BAYER) ? ({4{proc_p_bd}}) :
+        (pixel_dither == DITHER_BN_1BIT) ? ({4{proc_p_n1}}) :
+        (pixel_dither == DITHER_BN_4BIT) ? (proc_p_n4) : {proc_p_e4};
 
     `define NO_DRIVE    2'b00
     `define DRIVE_BLACK 2'b01
@@ -379,7 +377,7 @@ module pixel_processing(
         // If set mode is active, override previous
         if (set_mode_apply) begin
             // Use the initial state preset
-            proc_bo = initial_mode; // Default
+            proc_bo = `DEFAULT_MODE; // Default
             case (op_param)
             `SETMODE_MANUAL_LUT_NO_DITHER:
                 proc_bo = {MODE_MANUAL_LUT_NO_DITHER, 4'd0, 6'd0, 4'd15};
@@ -395,8 +393,8 @@ module pixel_processing(
                 proc_bo = {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'b0, 2'b11};
             `SETMODE_AUTO_LUT_NO_DITHER:
                 proc_bo = {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0};
-            `SETMODE_AUTO_LUT_ERROR_DIFFUSION:
-                proc_bo = {MODE_AUTO_LUT_ERROR_DIFFUSION, 4'd0, 4'd15, 4'd0};
+            `SETMODE_AUTO_LUT_BLUE_NOISE:
+                proc_bo = {MODE_AUTO_LUT_BLUE_NOISE, 4'd0, 4'd15, 4'd0};
             default: begin
                 // Invalid input detected, default back to manual lut
                 proc_bo = {MODE_MANUAL_LUT_NO_DITHER, 4'd0, 6'd0, 4'd15};
@@ -419,7 +417,7 @@ module pixel_processing(
             else
                 proc_output = `DRIVE_WHITE;
             // Set initial mode
-            proc_bo = initial_mode;
+            proc_bo = `DEFAULT_MODE;
         end
     end
 

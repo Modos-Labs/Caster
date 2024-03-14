@@ -69,6 +69,9 @@ module caster(
     // Screen timing
     parameter SIMULATION = "TRUE";
 
+    // Features
+    parameter ENABLE_ERROR_DIFFUSION = "TRUE";
+
     // Output logic
     localparam SCAN_IDLE = 2'd0;
     localparam SCAN_WAITING = 2'd1;
@@ -345,9 +348,9 @@ module caster(
     wire [10:0] v_cnt_offset = scan_v_cnt - (vfp + vsync + vbp);
     /* verilator lint_on width */
     wire [3:0] s1_op_valid;
-	 genvar i;
+    genvar i;
     generate
-        for (i = 0; i < 4; i = i + 1) begin: op_valid_assign
+        for (i = 0; i < 4; i = i + 1) begin: gen_op_valid_assign
             wire [1:0] offset = i;
             wire [12:0] h_pixel = {h_cnt_offset, offset};
             assign s1_op_valid[i] =
@@ -363,15 +366,16 @@ module caster(
         s2_active <= s1_active;
 
     // Image dithering
-    wire [15:0] s2_pixel_bayer_dithered;
-    wire [15:0] s2_pixel_bn_dithered;
+    wire [3:0] s2_pixel_bayer_dithered;
+    wire [3:0] s2_pixel_bn1b_dithered;
+    wire [15:0] s2_pixel_bn4b_dithered;
 
     // Position for bayer dithering
     wire [2:0] x_pos;
     wire [2:0] y_pos;
 
     generate
-    if (COLORMODE == "DES") begin: des_counter
+    if (COLORMODE == "DES") begin: gen_des_counter
         reg [2:0] v_cnt_mod_6;
         reg [1:0] h_cnt_mod_3;
         wire [2:0] v_cnt_mod_6_inc = (v_cnt_mod_6 == 5) ?
@@ -402,7 +406,7 @@ module caster(
         assign x_pos = {1'b0, h_cnt_mod_3};
         assign y_pos = v_cnt_mod_6;
     end
-    else if (COLORMODE == "MONO") begin: mono_counter
+    else if (COLORMODE == "MONO") begin: gen_mono_counter
         assign x_pos = scan_h_cnt[2:0];
         assign y_pos = scan_v_cnt[2:0];
     end
@@ -420,10 +424,22 @@ module caster(
     endgenerate
 
     // Output dithered pixel 1 clock later
-    blue_noise_dithering blue_noise_dithering (
+    blue_noise_dithering #(
+        .OUTPUT_BITS(1)
+    ) blue_noise_dithering_1b (
         .clk(clk),
         .vin(s2_pixel_linear),
-        .vout(s2_pixel_bn_dithered),
+        .vout(s2_pixel_bn1b_dithered),
+        .x_pos(scan_h_cnt[3:0]),
+        .y_pos(scan_v_cnt[5:0])
+    );
+
+    blue_noise_dithering #(
+        .OUTPUT_BITS(4)
+    ) blue_noise_dithering_4b (
+        .clk(clk),
+        .vin(s2_pixel_linear),
+        .vout(s2_pixel_bn4b_dithered),
         .x_pos(scan_h_cnt[3:0]),
         .y_pos(scan_v_cnt[5:0])
     );
@@ -439,19 +455,26 @@ module caster(
     );
 
     wire [15:0] s2_pixel_ed4b_dithered;
-    error_diffusion_dithering #(
-        .INPUT_BITS(8),
-        .OUTPUT_BITS(4),
-        .PIXEL_RATE(4)
-    ) ed4b_dithering (
-        .clk(clk),
-        .rst(rst),
-        .in(s2_pixel_linear),
-        .in_valid(s2_active),
-        .hsync(s1_hsync),
-        .vsync(scan_in_vsync),
-        .out(s2_pixel_ed4b_dithered)
-    );
+    generate if (ENABLE_ERROR_DIFFUSION == "TRUE") begin
+        error_diffusion_dithering #(
+            .INPUT_BITS(8),
+            .OUTPUT_BITS(4),
+            .PIXEL_RATE(4)
+        ) ed4b_dithering (
+            .clk(clk),
+            .rst(rst),
+            .in(s2_pixel_linear),
+            .in_valid(s2_active),
+            .hsync(s1_hsync),
+            .vsync(scan_in_vsync),
+            .out(s2_pixel_ed4b_dithered)
+        );
+    end
+    else begin
+        // Error diffusion algorithm disabled through parameter
+        // Use blue noise as approximation
+        assign s2_pixel_ed4b_dithered = s2_pixel_bn4b_dithered;
+    end endgenerate
 
     // Slice Y8 input downto Y4
     wire [15:0] s1_vin_pixel_y4 = {vin_pixel[31:28], vin_pixel[23:20],
@@ -535,15 +558,18 @@ module caster(
 
     reg [63:0] s3_bi_pixel;
     reg [15:0] s3_vin_pixel;
-    reg [15:0] s3_pixel_bayer_dithered;
-    reg [15:0] s3_pixel_bn_dithered;
+    reg [3:0] s3_pixel_bayer_dithered;
+    reg [3:0] s3_pixel_bn1b_dithered;
+    reg [15:0] s3_pixel_bn4b_dithered;
     reg [15:0] s3_pixel_ed4b_dithered;
     reg [3:0] s3_op_valid;
     always @(posedge clk) begin
         s3_vin_pixel <= s2_vin_pixel;
         s3_bi_pixel <= s2_bi_pixel;
+        // For 1 bit dithering, only pick MSB of each pixel
         s3_pixel_bayer_dithered <= s2_pixel_bayer_dithered;
-        s3_pixel_bn_dithered <= s2_pixel_bn_dithered;
+        s3_pixel_bn1b_dithered <= s2_pixel_bn1b_dithered;
+        s3_pixel_bn4b_dithered <= s2_pixel_bn4b_dithered;
         s3_pixel_ed4b_dithered <= s2_pixel_ed4b_dithered;
         s3_op_valid <= s2_op_valid;
     end
@@ -560,10 +586,11 @@ module caster(
     wire [63:0] bo_pixel_comb;
     wire [3:0] al_diff_pixel;
     generate
-        for (i = 0; i < 4; i = i + 1) begin: pix_proc
+        for (i = 0; i < 4; i = i + 1) begin: gen_pix_proc
             wire [3:0] proc_p_or = s3_vin_pixel[i*4+:4];
-            wire [3:0] proc_p_bd = s3_pixel_bayer_dithered[i*4+:4];
-            wire [3:0] proc_p_nd = s3_pixel_bn_dithered[i*4+:4];
+            wire proc_p_bd = s3_pixel_bayer_dithered[i];
+            wire proc_p_n1 = s3_pixel_bn1b_dithered[i];
+            wire [3:0] proc_p_n4 = s3_pixel_bn4b_dithered[i*4+:4];
             wire [3:0] proc_p_e4 = s3_pixel_ed4b_dithered[i*4+:4];
             wire [15:0] proc_bi = s3_bi_pixel[i*16+:16];
             wire [15:0] proc_bo;
@@ -575,7 +602,8 @@ module caster(
                 .csr_mindrv(csr_mindrv),
                 .proc_p_or(proc_p_or),
                 .proc_p_bd(proc_p_bd),
-                .proc_p_nd(proc_p_nd),
+                .proc_p_n1(proc_p_n1),
+                .proc_p_n4(proc_p_n4),
                 .proc_p_e4(proc_p_e4),
                 .proc_bi(proc_bi),
                 .proc_bo(proc_bo),
@@ -631,7 +659,7 @@ module caster(
     assign epd_sdclk = (scan_in_hfp || scan_in_hsync || scan_in_hact) ? ~clk : 1'b0;
 
     assign b_trigger = (scan_state == SCAN_WAITING);
-    
+
     assign dbg_scan_state = scan_state;
     assign dbg_scan_h_cnt = scan_h_cnt;
     assign dbg_scan_v_cnt = scan_v_cnt;
