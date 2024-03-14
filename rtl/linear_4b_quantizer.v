@@ -14,7 +14,10 @@
 `default_nettype none
 `timescale 1ns / 1ps
 module linear_4b_quantizer (
+    /* verilator lint_off UNUSEDSIGNAL */
+    // Only 6 MSBs used
     input wire [7:0] in,
+    /* verilator lint_on UNUSEDSIGNAL */
     output reg [3:0] index,
     output reg [7:0] linear
 );

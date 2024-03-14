@@ -16,8 +16,11 @@ module bayer_dithering (
     input wire        clk,
     input wire [31:0] vin,
     output reg [3:0]  vout,
+    /* verilator lint_off UNUSEDSIGNAL */
+    // Not all bits used in MONO mode
     input wire [2:0]  x_pos,
     input wire [2:0]  y_pos
+    /* verilator lint_on UNUSEDSIGNAL */
 );
     parameter COLORMODE = "DES";
 

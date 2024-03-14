@@ -54,7 +54,7 @@ module error_diffusion_kernel #(
     // WARN: underflow and overflow detection would fail if adder is not 10 bits
     wire [7:0] pix_qlinear;
     generate
-        if (OUTPUT_BITS == 1) begin
+        if (OUTPUT_BITS == 1) begin: gen_quantizer_1bit
             wire pix_quantized =
                 pix_adder[9] ? 1'b0 : // underflow
                 pix_adder[8] ? 1'b1 : // overflow
@@ -62,7 +62,7 @@ module error_diffusion_kernel #(
             assign pixel_out = pix_quantized;
             assign pix_qlinear = pix_quantized ? 8'hff : 8'h00;
         end
-        else if (OUTPUT_BITS == 4) begin
+        else if (OUTPUT_BITS == 4) begin: gen_quantizer_4bit
             wire [7:0] pix_clamped =
                 pix_adder[9] ? 8'd0 : // underflow
                 pix_adder[8] ? 8'd255 : // overflow
@@ -91,7 +91,7 @@ module error_diffusion_kernel #(
     wire [ERROR_BITS+1-1:0] err_bl_div = err_bl_mult[ERROR_BITS+4-1:3];
     wire [ERROR_BITS+1-1:0] err_b_div = err_b_mult[ERROR_BITS+4-1:3];
     wire [ERROR_BITS+1-1:0] err_br_div = err_br_mult[ERROR_BITS+4-1:3];
-    
+
     //    X r
     // bl b br
 

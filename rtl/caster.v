@@ -21,7 +21,10 @@ module caster(
     // New image Input, 4 pix per clock, Y8 input
     // This input is buffered after a ASYNC FIFO
     input  wire         vin_vsync,
+    /* verilator lint_off UNUSEDSIGNAL */
+    // Currently only 6 MSBs per pixel is used
     input  wire [31:0]  vin_pixel,
+    /* verilator lint_on UNUSEDSIGNAL */
     input  wire         vin_valid,
     output wire         vin_ready,
     // Framebuffer input
@@ -455,7 +458,7 @@ module caster(
     );
 
     wire [15:0] s2_pixel_ed4b_dithered;
-    generate if (ENABLE_ERROR_DIFFUSION == "TRUE") begin
+    generate if (ENABLE_ERROR_DIFFUSION == "TRUE") begin: gen_err_diff
         error_diffusion_dithering #(
             .INPUT_BITS(8),
             .OUTPUT_BITS(4),
@@ -470,7 +473,7 @@ module caster(
             .out(s2_pixel_ed4b_dithered)
         );
     end
-    else begin
+    else begin: gen_err_diff_approx
         // Error diffusion algorithm disabled through parameter
         // Use blue noise as approximation
         assign s2_pixel_ed4b_dithered = s2_pixel_bn4b_dithered;

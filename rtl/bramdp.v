@@ -46,9 +46,9 @@ module bramdp #(
         else
             doutb <= mem[addrb];
     end
-    
+
     generate
-        if (INITIALIZE == 1) begin
+        if (INITIALIZE == 1) begin: gen_bram_init
             initial begin
                 $readmemh(INIT_FILE, mem);
             end

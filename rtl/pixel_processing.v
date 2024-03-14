@@ -195,7 +195,10 @@ module pixel_processing(
         ((op_framecnt[4:3] == 2'b11) ? 4'h0 :
         (op_framecnt[5] ? 4'h0 : 4'hF));
 
+    /* verilator lint_off UNUSEDSIGNAL */
+    // Only 4 MSBs used
     wire [7:0] proc_p_li; // linear
+    /* verilator lint_on UNUSEDSIGNAL */
     // Let it optimize, only 4b in and 4b out used
     degamma degamma (
         .in({proc_p_or, proc_p_or[1:0]}),

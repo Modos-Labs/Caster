@@ -18,7 +18,7 @@ module error_diffusion_dithering #(
     parameter INPUT_BITS = 8, // Fixed 8, only 6 MSBs are used
     parameter OUTPUT_BITS = 4, // 1 or 4
     parameter PIXEL_RATE = 4, // pixels per cycle
-	 parameter PIXEL_RATE_LOG2 = 2 // $clog2(PIXEL_RATE) is not supported by ISE
+    parameter PIXEL_RATE_LOG2 = 2 // $clog2(PIXEL_RATE) is not supported by ISE
 ) (
     input wire clk,
     input wire rst,
@@ -74,7 +74,7 @@ module error_diffusion_dithering #(
     // delayed by 3 clks
     reg s3_valid;
     reg [EB_ABITS-1:0] s3_x_counter;
-    
+
     // The wb buffer functions like a shift register, for the first cycle only
     // 3 pixels are valid and for the last cycle only 1 pixel is valid. For all
     // cycles in the middle, 4 pixels are valid.
@@ -166,7 +166,7 @@ module error_diffusion_dithering #(
     // cycle  2: valid = 1, rptr = 3, wptr = 0, we = 1 (pix 0 wb registered)
 
     always @(posedge clk) begin
-        
+
         if (vsync) begin
             line_valid <= 1'b0;
             first_line <= 1'b1;
@@ -184,7 +184,7 @@ module error_diffusion_dithering #(
             if (in_valid || line_valid)
                 x_counter <= x_counter_inc;
         end
-        
+
         // Pipeline registers
         s1_valid <= in_valid;
         s1_x_counter <= x_counter;
