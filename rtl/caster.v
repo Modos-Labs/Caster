@@ -218,10 +218,8 @@ module caster(
     reg [7:0] op_framecnt; // Framecount for operation transition
     assign op_done = op_framecnt == 0;
 
-    // Counters for auto LUT mode
+    // Counters for auto LUT mode, free running
     reg [5:0] al_framecnt;
-    reg al_diff_reg;
-    wire al_diff;
 
     always @(posedge clk) begin
         case (scan_state)
@@ -251,14 +249,11 @@ module caster(
                 end
                 // Update Auto LUT state
                 if (al_framecnt == 0) begin
-                    if (al_diff_reg) begin
-                        al_framecnt <= csr_lutframe;
-                    end
+                    al_framecnt <= csr_lutframe;
                 end
                 else begin
                     al_framecnt <= al_framecnt - 1;
                 end
-                al_diff_reg <= 1'b0;
             end
             else begin
                 scan_h_cnt <= scan_h_cnt + 1;
@@ -277,9 +272,6 @@ module caster(
             else begin
                 scan_h_cnt <= scan_h_cnt + 1;
             end
-            // Update auto LUT state
-            if (al_diff)
-                al_diff_reg <= 1'b1;
             // Kill frame output if fifo underrun is detected
             if ((vin_ready && !vin_valid) && (bi_ready && !bi_valid)) begin
                 frame_valid <= 1'b0;
@@ -298,7 +290,6 @@ module caster(
             scan_v_cnt <= 0;
             op_state <= `OP_INIT;
             op_framecnt <= OP_INIT_LENGTH;
-            al_diff_reg <= 0;
             al_framecnt <= 0;
         end
     end
@@ -587,7 +578,6 @@ module caster(
 
     wire [7:0] pixel_comb;
     wire [63:0] bo_pixel_comb;
-    wire [3:0] al_diff_pixel;
     generate
         for (i = 0; i < 4; i = i + 1) begin: gen_pix_proc
             wire [3:0] proc_p_or = s3_vin_pixel[i*4+:4];
@@ -617,8 +607,7 @@ module caster(
                 .op_cmd(op_cmd),
                 .op_param(op_param),
                 .op_framecnt(op_framecnt),
-                .al_framecnt(al_framecnt),
-                .al_diff(al_diff_pixel[i])
+                .al_framecnt(al_framecnt)
             );
 
             // Output
@@ -626,7 +615,6 @@ module caster(
             assign bo_pixel_comb[i*16+:16] = frame_valid ? proc_bo : proc_bi;
         end
     endgenerate
-    assign al_diff = s4_active && (|al_diff_pixel);
 
     reg [7:0] current_pixel;
     always @(posedge clk) begin

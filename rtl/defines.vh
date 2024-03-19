@@ -82,10 +82,10 @@
 //`define USE_BLUE_NOISE  // Use blue noise instead of bayer
 
 // Mode entered during power up
-`define INIT_AUTO_LUT_ND    {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0}
-`define INIT_AUTO_LUT_OD    {MODE_AUTO_LUT_BLUE_NOISE, 4'd0, 4'd15, 4'd0}
+`define INIT_AUTO_LUT_ND    {MODE_AUTO_LUT_NO_DITHER, 2'd0, 6'd0, 4'd15}
+`define INIT_AUTO_LUT_OD    {MODE_AUTO_LUT_BLUE_NOISE, 2'd0, 6'd0, 4'd15}
 `define INIT_FAST_MONO_OD   {MODE_FAST_MONO_ORDERED, 2'b0, 6'd0, 3'd0, 1'b1}
 `define INIT_FAST_MONO_ND   {MODE_FAST_MONO_NO_DITHER, 2'b0, 6'd0, 3'd0, 1'b1}
 `define INIT_FAST_GREY      {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'd0, 2'b11}
 
-`define DEFAULT_MODE        `INIT_AUTO_LUT_OD
+`define DEFAULT_MODE        `INIT_AUTO_LUT_ND

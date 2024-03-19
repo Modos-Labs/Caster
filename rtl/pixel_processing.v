@@ -30,8 +30,7 @@ module pixel_processing(
     input  wire [7:0]  op_cmd,      // External operation command
     input  wire [7:0]  op_param,    // External operation parameter
     input  wire [7:0]  op_framecnt, // Current overall frame counter for state
-    input  wire [5:0]  al_framecnt, // Auto LUT mode frame counter
-    output reg         al_diff      // Auto LUT mode input change detected
+    input  wire [5:0]  al_framecnt  // Auto LUT mode frame counter
 );
 
     // Pixel state: 16bits
@@ -57,26 +56,37 @@ module pixel_processing(
     localparam FASTG_W2G_FRAMES = 6'd1;
     localparam FASTG_SETTLE_FRAMES = 6'd5;
 
+    localparam AUTOLUT_HOLDOFF_FRAMES = 6'd60;
+
     // In auto LUT mode:
-    // Bit 11-8: Reserved
+    // Bit 11-10: Stage
+    // In MONO stage:
+    // Bit 9-4: Frame counter
+    // Bit 3-2: Dynamic frame rate cap
+    // Bit 1: Reserved, keep at 0
+    // Bit 0: Previous frame pixel value (0 black 1 white)
+    // In DONE/HOLD stage:
+    // Bit 9-4: Frame counter
+    // Bit 3-0: Last pixel value
+    // In GREY stage:
+    // Bit 9-8: Reserved
     // Bit 7-4: Source pixel value
     // Bit 3-0: Target pixel value
-    // Auto LUT mode uses a global framecounter to keep global synchronization,
-    // and insufficient space to keep counter in per pixel state.
-    // Just an idea, it's also possible to create a bounding box for all changed
-    // pixels and only update inside the bounding box. However ghosting may
-    // prove this to be a bad idea.
-    // When frame counter is not 0, waveform lookup is in progress.
-    // When lookup is in progress, the state is kept in still, until the last
-    // frame where the dest value is copied to source value.
-    // When lookup is not in progress, the input pixel and source pixel
-    // value is compared. If doesn't match, a flag is output to the external
-    // logic for determining the region of update. The destination pixel value
-    // is always updated.
-    // In auto LUT modes, same color update is ignored (does not trigger the
-    // clearing process). As a result ghosting could be bad and user will need
-    // to use clear button to manually clear the screen. It does avoid the
-    // flashing caused by tiny changes on the screen.
+    // Auto LUT mode is a hybrid between fast mono mode and dithered LUT mode.
+    // The update process of each pixel is divided into 4 stages:
+    localparam STAGE_DONE = 2'd0; // Screen already settled. No operation
+    localparam STAGE_MONO = 2'd1; // Driving to mono (same as fast mono mode)
+    localparam STAGE_HOLD = 2'd2; // Hold off (wait before start driving greyscale)
+    localparam STAGE_GREY = 2'd3; // Driving to greyscale (non-cancellable)
+    // When change is detected on the DONE pixel, it kicks off the update process
+    // immediately similar to the fast mono mode, entering the MONO stage.
+    // Once the mono update is done, it enters the HOLD stage.
+    // If changes are detected during HOLD stage, it goes back to the MONO stage.
+    // If the HOLD stage times out (means no changes are ever detected) and global
+    // greyscale counter is at 1 (next round starts the next frame), it updates
+    // The source and destination colors and enters GREY stage.
+    // In the GREY stage it follows the waveform LUT to drive the screen. Once
+    // that's done it goes back to the DONE stage.
 
     // In manual LUT mode:
     // Bit 13-10: Source pixel value
@@ -102,18 +112,12 @@ module pixel_processing(
     // Bit 9-4: Frame counter
     // Bit 3-2: Reserved, keep at 0
     // Bit 1-0: Previous frame pixel value
-    // It matches, continue the current operation:
-    localparam STAGE_DONE = 2'd0; // Screen already settled. No operation
-    localparam STAGE_MONO = 2'd1; // Driving to mono (same as fast mono mode)
-    localparam STAGE_HOLD = 2'd2; // Hold off (wait before start driving greyscale)
-    localparam STAGE_GREY = 2'd3; // Driving to greyscale (non-cancellable)
 
     // Pixel processing
     wire [1:0] pixel_mode_hi = proc_bi[15:14];
     wire [3:0] pixel_mode = proc_bi[15:12];
     wire [1:0] pixel_stage = proc_bi[11:10];
     wire [5:0] pixel_framecnt = proc_bi[9:4];
-    wire [3:0] pixel_autolut_src = proc_bi[7:4];
     wire [3:0] pixel_prev = proc_bi[3:0];
     wire [1:0] pixel_mindrv = proc_bi[3:2];
     wire [5:0] pixel_framecnt_dec = pixel_framecnt - 1;
@@ -220,7 +224,6 @@ module pixel_processing(
 
     always @(*) begin
         // Normal mode, init mode override later
-        al_diff = 1'b0;
         case (pixel_basemode)
         BASEMODE_MANUAL_LUT: begin
             if (pixel_framecnt != 0) begin
@@ -240,29 +243,92 @@ module pixel_processing(
             end
         end
         BASEMODE_AUTO_LUT: begin
-            if (al_framecnt != 0) begin
-                // Update in progress, ignore same color update
-                if (pixel_autolut_src == pixel_prev) begin
-                    proc_output = `NO_DRIVE;
+            if (pixel_stage == STAGE_MONO) begin
+                // Framecnt != 0 means in MONO stage
+                // Dynamic frame rate cap:
+                // Once the pixel state is changed, the DYFRC field is reset to
+                // the CSR val.
+                // The field value is then decremented every frame until 0
+                // Change to a new color is only allowed if the field is 0
+                // Currently updating
+                if ((proc_vin[3] != pixel_prev[0]) && (pixel_mindrv == 2'd0)) begin
+                    // Pixel state changed
+                    proc_output = drive_towards_input;
+                    proc_bo = proc_vin[3] ? (
+                        {proc_bi[15:10], pixel_framecnt_2w, csr_mindrv, 2'd1}
+                    ) : {proc_bi[15:10], pixel_framecnt_2b, csr_mindrv, 2'd0};
                 end
                 else begin
-                    proc_output = proc_lut_rd;
+                    // Pixel state not changed
+                    proc_output = pixel_prev[0] ? `DRIVE_WHITE : `DRIVE_BLACK;
+                    // Finishing mono update next frame
+                    if (pixel_framecnt == 1) begin
+                        if ((proc_vin[3:0] == 4'b1111) || (proc_vin[3:0] == 4'b0000)) begin
+                            // Already at target color, no need to enter grayscale stage
+                            proc_bo = {proc_bi[15:12], STAGE_DONE, 6'd0, proc_vin[3:0]};
+                        end
+                        else begin
+                            // Hold off for some time before start grayscale render
+                            proc_bo = {proc_bi[15:12], STAGE_HOLD, AUTOLUT_HOLDOFF_FRAMES, proc_vin[3:0]};
+                        end
+                    end
+                    else begin
+                        proc_bo = {proc_bi[15:10], pixel_framecnt_dec, pixel_mindrv_dec, proc_bi[1:0]};
+                    end
                 end
+            end
+            else if ((pixel_stage == STAGE_HOLD) || (pixel_stage == STAGE_DONE)) begin
+                // Not currently updating
+                if (proc_vin[3] != pixel_prev[3]) begin
+                    // Pixel state changed
+                    proc_output = drive_towards_input;
+                    proc_bo = proc_vin[3] ? (
+                        {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, csr_mindrv, 2'd1}
+                    ) : {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, csr_mindrv, 2'd0};
+                end
+                else if (proc_vin[2:0] != pixel_prev[2:0]) begin
+                    // Only grayscale part changed, no need to enter MONO mode again
+                    // If in DONE stage, enter hold stage
+                    // If in HOLD stage, simply update the target color
+                    proc_bo = {proc_bi[15:12], STAGE_HOLD,
+                        (pixel_stage == STAGE_DONE) ? AUTOLUT_HOLDOFF_FRAMES :
+                        (pixel_framecnt == 'd0) ? 6'd0 : pixel_framecnt_dec, // Make sure we don't underflow
+                        proc_vin[3:0]};
+                end
+                else begin
+                    // Pixel state not changed
+                    proc_output = `NO_DRIVE;
+                    if (pixel_stage == STAGE_HOLD) begin
+                        if (pixel_framecnt == 0) begin
+                            // Greyscale mode can be entered only if global counter is at last frame
+                            if (al_framecnt == 0) begin
+                                proc_bo = {proc_bi[15:12], STAGE_GREY, 2'b0, {4{pixel_prev[0]}}, proc_vin};
+                            end
+                            else begin
+                                proc_bo = proc_bi; // Wait
+                            end
+                        end
+                        else begin
+                            // Count down
+                            proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+                        end
+                    end
+                    else begin
+                        // In done stage, do nothing
+                        proc_bo = proc_bi;
+                    end
+                end
+            end
+            else begin
+                // In grey stage
                 proc_output = proc_lut_rd;
-                if (al_framecnt == 1) begin
-                    // Last frame, copy destination value to source value
-                    proc_bo = {proc_bi[15:8], pixel_prev, proc_vin};
+                if (al_framecnt == 0) begin
+                    // Finished refresh cycle, enter done stage
+                    proc_bo = {proc_bi[15:12], STAGE_DONE, 6'd0, pixel_prev[3:0]};
                 end
                 else begin
                     proc_bo = proc_bi;
                 end
-            end
-            else begin
-                // Not updating, keep old source, update destination
-                proc_output = `NO_DRIVE;
-                proc_bo = {proc_bi[15:4], proc_vin};
-                if (proc_vin != pixel_autolut_src)
-                    al_diff = 1'b1;
             end
         end
         BASEMODE_FAST_MONO: begin
