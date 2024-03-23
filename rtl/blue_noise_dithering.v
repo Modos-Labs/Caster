@@ -76,10 +76,10 @@ module blue_noise_dithering #(
     wire [7:0] a2 = vin[15:8];
     wire [7:0] a3 = vin[7:0];
 
-    adder_sat_8 adder_sat0 (a0, {{NOISE_ATTEN{1'd0}}, b0[7:NOISE_ATTEN]}, c0);
-    adder_sat_8 adder_sat1 (a1, {{NOISE_ATTEN{1'd0}}, b1[7:NOISE_ATTEN]}, c1);
-    adder_sat_8 adder_sat2 (a2, {{NOISE_ATTEN{1'd0}}, b2[7:NOISE_ATTEN]}, c2);
-    adder_sat_8 adder_sat3 (a3, {{NOISE_ATTEN{1'd0}}, b3[7:NOISE_ATTEN]}, c3);
+    adder_sat_8 adder_sat0 (a0, {{NOISE_ATTEN{b0[7]}}, b0[7:NOISE_ATTEN]}, c0);
+    adder_sat_8 adder_sat1 (a1, {{NOISE_ATTEN{b1[7]}}, b1[7:NOISE_ATTEN]}, c1);
+    adder_sat_8 adder_sat2 (a2, {{NOISE_ATTEN{b2[7]}}, b2[7:NOISE_ATTEN]}, c2);
+    adder_sat_8 adder_sat3 (a3, {{NOISE_ATTEN{b3[7]}}, b3[7:NOISE_ATTEN]}, c3);
     assign vo_dithered = {
         c0[7-:OUTPUT_BITS],
         c1[7-:OUTPUT_BITS],

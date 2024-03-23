@@ -58,7 +58,7 @@
 
 // Define this to enable operation by default after reset
 // Used for debugging purpose only
-//`define CSR_SELFBOOT
+`define CSR_SELFBOOT
 
 `define DEFAULT_VFP         8'd12
 `define DEFAULT_VSYNC       8'd1
@@ -70,7 +70,7 @@
 `define DEFAULT_HACT        12'd400
 //`define DEFAULT_VFP         8'd12
 //`define DEFAULT_VSYNC       8'd1
-//`define DEFAULT_VBP         8'd3
+//`define DEFAULT_VBP         8'd2
 //`define DEFAULT_VACT        12'd758
 //`define DEFAULT_HFP         8'd72
 //`define DEFAULT_HSYNC       8'd2
@@ -84,8 +84,9 @@
 // Mode entered during power up
 `define INIT_AUTO_LUT_ND    {MODE_AUTO_LUT_NO_DITHER, 2'd0, 6'd0, 4'd15}
 `define INIT_AUTO_LUT_OD    {MODE_AUTO_LUT_BLUE_NOISE, 2'd0, 6'd0, 4'd15}
-`define INIT_FAST_MONO_OD   {MODE_FAST_MONO_ORDERED, 2'b0, 6'd0, 3'd0, 1'b1}
+`define INIT_FAST_MONO_BD   {MODE_FAST_MONO_BAYER, 2'b0, 6'd0, 3'd0, 1'b1}
+`define INIT_FAST_MONO_BN   {MODE_FAST_MONO_BLUE_NOISE, 2'b0, 6'd0, 3'd0, 1'b1}
 `define INIT_FAST_MONO_ND   {MODE_FAST_MONO_NO_DITHER, 2'b0, 6'd0, 3'd0, 1'b1}
 `define INIT_FAST_GREY      {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'd0, 2'b11}
 
-`define DEFAULT_MODE        `INIT_AUTO_LUT_ND
+`define DEFAULT_MODE        `INIT_FAST_MONO_BD

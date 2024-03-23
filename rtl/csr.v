@@ -132,54 +132,7 @@ module csr(
             {mig_error, mif_error, sys_ready, op_busy, op_queue, 2'd0, csr_en} :
         8'd0;
 
-    always @(posedge clk) begin
-        csr_lutwe <= 1'b0;
-        csr_ope <= 1'b0;
-        if (spi_req_wen) begin
-            case (spi_req_addr)
-            `CSR_LUT_FRAME: csr_lutframe <= spi_req_wdata[5:0];
-            `CSR_LUT_ADDR_HI: csr_lutaddr[11:8] <= spi_req_wdata[3:0];
-            `CSR_LUT_ADDR_LO: csr_lutaddr[7:0] <= spi_req_wdata;
-            `CSR_LUT_WR: begin
-                csr_lutwr <= spi_req_wdata;
-                csr_lutwe <= 1'b1;
-            end
-            `CSR_OP_LEFT_HI: csr_opleft[11:8] <= spi_req_wdata[3:0];
-            `CSR_OP_LEFT_LO: csr_opleft[7:0] <= spi_req_wdata;
-            `CSR_OP_RIGHT_HI: csr_opright[11:8] <= spi_req_wdata[3:0];
-            `CSR_OP_RIGHT_LO: csr_opright[7:0] <= spi_req_wdata;
-            `CSR_OP_TOP_HI: csr_optop[11:8] <= spi_req_wdata[3:0];
-            `CSR_OP_TOP_LO: csr_optop[7:0] <= spi_req_wdata;
-            `CSR_OP_BOTTOM_HI: csr_opbottom[11:8] <= spi_req_wdata[3:0];
-            `CSR_OP_BOTTOM_LO: csr_opbottom[7:0] <= spi_req_wdata;
-            `CSR_OP_PARAM: csr_opparam <= spi_req_wdata;
-            `CSR_OP_LENGTH: csr_oplength <= spi_req_wdata;
-            `CSR_OP_CMD: begin
-                csr_opcmd <= spi_req_wdata;
-                csr_ope <= 1'b1;
-            end
-            `CSR_ENABLE: begin
-                csr_en <= spi_req_wdata[0];
-            end
-            `CSR_CFG_V_FP: csr_cfg_vfp <= spi_req_wdata;
-            `CSR_CFG_V_SYNC: csr_cfg_vsync <= spi_req_wdata;
-            `CSR_CFG_V_BP: csr_cfg_vbp <= spi_req_wdata;
-            `CSR_CFG_V_ACT_HI: csr_cfg_vact[11:8] <= spi_req_wdata[3:0];
-            `CSR_CFG_V_ACT_LO: csr_cfg_vact[7:0] <= spi_req_wdata;
-            `CSR_CFG_H_FP: csr_cfg_hfp <= spi_req_wdata;
-            `CSR_CFG_H_SYNC: csr_cfg_hsync <= spi_req_wdata;
-            `CSR_CFG_H_BP: csr_cfg_hbp <= spi_req_wdata;
-            `CSR_CFG_H_ACT_HI: csr_cfg_hact[11:8] <= spi_req_wdata[3:0];
-            `CSR_CFG_H_ACT_LO: csr_cfg_hact[7:0] <= spi_req_wdata;
-            `CSR_CFG_FBYTES_B2: csr_cfg_fbytes[23:16] <= spi_req_wdata;
-            `CSR_CFG_FBYTES_B1: csr_cfg_fbytes[15:8] <= spi_req_wdata;
-            `CSR_CFG_FBYTES_B0: csr_cfg_fbytes[7:0] <= spi_req_wdata;
-            `CSR_CFG_MINDRV: csr_cfg_mindrv <= spi_req_wdata[1:0];
-            default: begin
-                // no op
-            end
-            endcase
-        end
+    always @(posedge clk or posedge rst) begin
         if (rst) begin
             csr_lutframe <= 6'd38; // Needs to match default waveform
             csr_lutwe <= 1'b0;
@@ -199,6 +152,55 @@ module csr(
             `else
             csr_en <= 1'b0;
             `endif
+        end
+        else begin
+            csr_lutwe <= 1'b0;
+            csr_ope <= 1'b0;
+            if (spi_req_wen) begin
+                case (spi_req_addr)
+                `CSR_LUT_FRAME: csr_lutframe <= spi_req_wdata[5:0];
+                `CSR_LUT_ADDR_HI: csr_lutaddr[11:8] <= spi_req_wdata[3:0];
+                `CSR_LUT_ADDR_LO: csr_lutaddr[7:0] <= spi_req_wdata;
+                `CSR_LUT_WR: begin
+                    csr_lutwr <= spi_req_wdata;
+                    csr_lutwe <= 1'b1;
+                end
+                `CSR_OP_LEFT_HI: csr_opleft[11:8] <= spi_req_wdata[3:0];
+                `CSR_OP_LEFT_LO: csr_opleft[7:0] <= spi_req_wdata;
+                `CSR_OP_RIGHT_HI: csr_opright[11:8] <= spi_req_wdata[3:0];
+                `CSR_OP_RIGHT_LO: csr_opright[7:0] <= spi_req_wdata;
+                `CSR_OP_TOP_HI: csr_optop[11:8] <= spi_req_wdata[3:0];
+                `CSR_OP_TOP_LO: csr_optop[7:0] <= spi_req_wdata;
+                `CSR_OP_BOTTOM_HI: csr_opbottom[11:8] <= spi_req_wdata[3:0];
+                `CSR_OP_BOTTOM_LO: csr_opbottom[7:0] <= spi_req_wdata;
+                `CSR_OP_PARAM: csr_opparam <= spi_req_wdata;
+                `CSR_OP_LENGTH: csr_oplength <= spi_req_wdata;
+                `CSR_OP_CMD: begin
+                    csr_opcmd <= spi_req_wdata;
+                    csr_ope <= 1'b1;
+                end
+                `CSR_ENABLE: begin
+                    csr_en <= spi_req_wdata[0];
+                end
+                `CSR_CFG_V_FP: csr_cfg_vfp <= spi_req_wdata;
+                `CSR_CFG_V_SYNC: csr_cfg_vsync <= spi_req_wdata;
+                `CSR_CFG_V_BP: csr_cfg_vbp <= spi_req_wdata;
+                `CSR_CFG_V_ACT_HI: csr_cfg_vact[11:8] <= spi_req_wdata[3:0];
+                `CSR_CFG_V_ACT_LO: csr_cfg_vact[7:0] <= spi_req_wdata;
+                `CSR_CFG_H_FP: csr_cfg_hfp <= spi_req_wdata;
+                `CSR_CFG_H_SYNC: csr_cfg_hsync <= spi_req_wdata;
+                `CSR_CFG_H_BP: csr_cfg_hbp <= spi_req_wdata;
+                `CSR_CFG_H_ACT_HI: csr_cfg_hact[11:8] <= spi_req_wdata[3:0];
+                `CSR_CFG_H_ACT_LO: csr_cfg_hact[7:0] <= spi_req_wdata;
+                `CSR_CFG_FBYTES_B2: csr_cfg_fbytes[23:16] <= spi_req_wdata;
+                `CSR_CFG_FBYTES_B1: csr_cfg_fbytes[15:8] <= spi_req_wdata;
+                `CSR_CFG_FBYTES_B0: csr_cfg_fbytes[7:0] <= spi_req_wdata;
+                `CSR_CFG_MINDRV: csr_cfg_mindrv <= spi_req_wdata[1:0];
+                default: begin
+                    // no op
+                end
+                endcase
+            end
         end
     end
 

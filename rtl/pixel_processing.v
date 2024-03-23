@@ -52,11 +52,45 @@ module pixel_processing(
 
     //
     localparam FASTG_HOLDOFF_FRAMES = 6'd10;
-    localparam FASTG_B2G_FRAMES = 6'd1;
-    localparam FASTG_W2G_FRAMES = 6'd1;
+    localparam FASTG_B2G_FRAMES = 6'd2;
+    localparam FASTG_W2G_FRAMES = 6'd2;
     localparam FASTG_SETTLE_FRAMES = 6'd5;
 
     localparam AUTOLUT_HOLDOFF_FRAMES = 6'd60;
+
+    wire [5:0] fastg_g2w_frames =
+        (pixel_prev == 4'd0) ? 6'd9 : // Black to white
+        (pixel_prev == 4'd1) ? 6'd9 :
+        (pixel_prev == 4'd2) ? 6'd9 :
+        (pixel_prev == 4'd3) ? 6'd9 :
+        (pixel_prev == 4'd4) ? 6'd8 :
+        (pixel_prev == 4'd5) ? 6'd8 :
+        (pixel_prev == 4'd6) ? 6'd8 :
+        (pixel_prev == 4'd7) ? 6'd7 :
+        (pixel_prev == 4'd8) ? 6'd7 :
+        (pixel_prev == 4'd9) ? 6'd6 :
+        (pixel_prev == 4'd10) ? 6'd6 :
+        (pixel_prev == 4'd11) ? 6'd5 :
+        (pixel_prev == 4'd12) ? 6'd4 :
+        (pixel_prev == 4'd13) ? 6'd3 :
+        (pixel_prev == 4'd14) ? 6'd2 :
+                             6'd1;
+    wire [5:0] fastg_g2b_frames =
+        (pixel_prev == 4'd0) ? 6'b1 : // Black to black
+        (pixel_prev == 4'd1) ? 6'd2 :
+        (pixel_prev == 4'd2) ? 6'd2 :
+        (pixel_prev == 4'd3) ? 6'd3 :
+        (pixel_prev == 4'd4) ? 6'd3 :
+        (pixel_prev == 4'd5) ? 6'd4 :
+        (pixel_prev == 4'd6) ? 6'd4 :
+        (pixel_prev == 4'd7) ? 6'd5 :
+        (pixel_prev == 4'd8) ? 6'd6 :
+        (pixel_prev == 4'd9) ? 6'd7 :
+        (pixel_prev == 4'd10) ? 6'd8 :
+        (pixel_prev == 4'd11) ? 6'd9 :
+        (pixel_prev == 4'd12) ? 6'd9 :
+        (pixel_prev == 4'd13) ? 6'd9 :
+        (pixel_prev == 4'd14) ? 6'd9 : 6'd9;
 
     // In auto LUT mode:
     // Bit 11-10: Stage
@@ -125,6 +159,8 @@ module pixel_processing(
     // Specific to fast mono mode
     wire [5:0] pixel_framecnt_2w = FASTM_B2W_FRAMES - pixel_framecnt + 1;
     wire [5:0] pixel_framecnt_2b = FASTM_W2B_FRAMES - pixel_framecnt + 1;
+    wire [3:0] pixel_prev_bext = {4{pixel_prev[0]}};
+    wire [3:0] pixel_vin_bext = {4{proc_vin[3]}};
 
     // Decode base mode and dither mode
     localparam BASEMODE_MANUAL_LUT = 2'b00;
@@ -194,8 +230,7 @@ module pixel_processing(
     end
 
     wire [3:0] clear_color =
-        ((pixel_basemode == BASEMODE_AUTO_LUT) ||
-        (pixel_basemode == BASEMODE_MANUAL_LUT)) ? 4'hF :
+        (pixel_basemode == BASEMODE_MANUAL_LUT) ? 4'hF :
         ((op_framecnt[4:3] == 2'b11) ? 4'h0 :
         (op_framecnt[5] ? 4'h0 : 4'hF));
 
@@ -216,11 +251,14 @@ module pixel_processing(
         (pixel_dither == DITHER_BN_1BIT) ? ({4{proc_p_n1}}) :
         (pixel_dither == DITHER_BN_4BIT) ? (proc_p_n4) : {proc_p_e4};
 
+    wire [3:0] proc_vinnd = force_clear ? clear_color : proc_p_li[7:4];
+
     `define NO_DRIVE    2'b00
     `define DRIVE_BLACK 2'b01
     `define DRIVE_WHITE 2'b10
 
     wire [1:0] drive_towards_input = proc_vin[3] ? `DRIVE_WHITE: `DRIVE_BLACK;
+    wire [1:0] drive_against_input = proc_vin[3] ? `DRIVE_BLACK: `DRIVE_WHITE;
 
     always @(*) begin
         // Normal mode, init mode override later
@@ -245,16 +283,11 @@ module pixel_processing(
         BASEMODE_AUTO_LUT: begin
             if (pixel_stage == STAGE_MONO) begin
                 // Framecnt != 0 means in MONO stage
-                // Dynamic frame rate cap:
-                // Once the pixel state is changed, the DYFRC field is reset to
-                // the CSR val.
-                // The field value is then decremented every frame until 0
-                // Change to a new color is only allowed if the field is 0
                 // Currently updating
-                if ((proc_vin[3] != pixel_prev[0]) && (pixel_mindrv == 2'd0)) begin
+                if ((proc_vinnd[3] != pixel_prev[0]) && (pixel_mindrv == 2'd0)) begin
                     // Pixel state changed
                     proc_output = drive_towards_input;
-                    proc_bo = proc_vin[3] ? (
+                    proc_bo = proc_vinnd[3] ? (
                         {proc_bi[15:10], pixel_framecnt_2w, csr_mindrv, 2'd1}
                     ) : {proc_bi[15:10], pixel_framecnt_2b, csr_mindrv, 2'd0};
                 end
@@ -262,71 +295,72 @@ module pixel_processing(
                     // Pixel state not changed
                     proc_output = pixel_prev[0] ? `DRIVE_WHITE : `DRIVE_BLACK;
                     // Finishing mono update next frame
-                    if (pixel_framecnt == 1) begin
-                        if ((proc_vin[3:0] == 4'b1111) || (proc_vin[3:0] == 4'b0000)) begin
-                            // Already at target color, no need to enter grayscale stage
-                            proc_bo = {proc_bi[15:12], STAGE_DONE, 6'd0, proc_vin[3:0]};
-                        end
-                        else begin
-                            // Hold off for some time before start grayscale render
-                            proc_bo = {proc_bi[15:12], STAGE_HOLD, AUTOLUT_HOLDOFF_FRAMES, proc_vin[3:0]};
-                        end
+                    if (pixel_framecnt == 0) begin
+                        // Hold off for some time before start grayscale render
+                        proc_bo = {proc_bi[15:12], STAGE_HOLD, AUTOLUT_HOLDOFF_FRAMES - FASTM_B2W_FRAMES, {4{pixel_prev[0]}}};
                     end
                     else begin
                         proc_bo = {proc_bi[15:10], pixel_framecnt_dec, pixel_mindrv_dec, proc_bi[1:0]};
                     end
                 end
             end
-            else if ((pixel_stage == STAGE_HOLD) || (pixel_stage == STAGE_DONE)) begin
-                // Not currently updating
-                if (proc_vin[3] != pixel_prev[3]) begin
-                    // Pixel state changed
+            else if (pixel_stage == STAGE_HOLD) begin
+                // Not currently updating, display in BINARY/ GREYSCALE mode
+                if (proc_vinnd[3] != pixel_prev[3]) begin
+                    // Binary pixel state changed
                     proc_output = drive_towards_input;
-                    proc_bo = proc_vin[3] ? (
+                    proc_bo = proc_vinnd[3] ? (
                         {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, csr_mindrv, 2'd1}
                     ) : {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, csr_mindrv, 2'd0};
                 end
-                else if (proc_vin[2:0] != pixel_prev[2:0]) begin
-                    // Only grayscale part changed, no need to enter MONO mode again
-                    // If in DONE stage, enter hold stage
-                    // If in HOLD stage, simply update the target color
-                    proc_bo = {proc_bi[15:12], STAGE_HOLD,
-                        (pixel_stage == STAGE_DONE) ? AUTOLUT_HOLDOFF_FRAMES :
-                        (pixel_framecnt == 'd0) ? 6'd0 : pixel_framecnt_dec, // Make sure we don't underflow
-                        proc_vin[3:0]};
-                end
                 else begin
-                    // Pixel state not changed
+                    // Pixel state not meaningfully changed
                     proc_output = `NO_DRIVE;
-                    if (pixel_stage == STAGE_HOLD) begin
-                        if (pixel_framecnt == 0) begin
-                            // Greyscale mode can be entered only if global counter is at last frame
-                            if (al_framecnt == 0) begin
-                                proc_bo = {proc_bi[15:12], STAGE_GREY, 2'b0, {4{pixel_prev[0]}}, proc_vin};
-                            end
-                            else begin
-                                proc_bo = proc_bi; // Wait
-                            end
+                    if (pixel_framecnt == 0) begin
+                        // Greyscale mode can be entered only if global counter is at last frame
+                        if (al_framecnt == 0) begin
+                            // Check pixel target color again, if it equals the current color,
+                            // don't bother, enter DONE
+                            // This could be due to a greyscale only change in the HOLD stage
+                            if (pixel_prev != proc_vin)
+                                proc_bo = {proc_bi[15:12], STAGE_GREY, 2'b0, pixel_prev, proc_vin};
+                            else
+                                proc_bo = {proc_bi[15:12], STAGE_DONE, 6'd0, pixel_prev};
                         end
                         else begin
-                            // Count down
-                            proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+                            proc_bo = proc_bi; // Wait
                         end
                     end
                     else begin
-                        // In done stage, do nothing
-                        proc_bo = proc_bi;
+                        // Count down
+                        proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
                     end
                 end
             end
-            else begin
+            else if (pixel_stage == STAGE_GREY) begin
                 // In grey stage
                 proc_output = proc_lut_rd;
                 if (al_framecnt == 0) begin
                     // Finished refresh cycle, enter done stage
-                    proc_bo = {proc_bi[15:12], STAGE_DONE, 6'd0, pixel_prev[3:0]};
+                    proc_bo = {proc_bi[15:12], STAGE_DONE, 6'd0, pixel_prev};
                 end
                 else begin
+                    proc_bo = proc_bi;
+                end
+            end
+            else if (pixel_stage == STAGE_DONE) begin
+                // Not currently updating, display in BINARY/ GREYSCALE mode
+                if (proc_vin[3:0] != pixel_prev[3:0]) begin
+                    // In GREYSCALE mode, any change triggers an update, frame count depends on the delta
+                    proc_output = drive_towards_input;
+                    proc_bo = proc_vin[3] ? (
+                        // To white, see if it's current dark grey or light grey
+                        {proc_bi[15:12], STAGE_MONO, fastg_g2w_frames, csr_mindrv, 2'd1}
+                    ) : {proc_bi[15:12], STAGE_MONO, fastg_g2b_frames, csr_mindrv, 2'd0};
+                end
+                else begin
+                    // Nothing has changed, do nothing
+                    proc_output = `NO_DRIVE;
                     proc_bo = proc_bi;
                 end
             end
@@ -373,20 +407,20 @@ module pixel_processing(
             if (pixel_stage == STAGE_MONO) begin
                 // Currently updating
                 proc_output = drive_towards_input;
-                if (proc_vin[3] != pixel_prev[1]) begin
+                if ((proc_vin[3] != pixel_prev[1]) && (pixel_mindrv == 2'd0)) begin
                     // Pixel state changed
                     proc_bo = proc_vin[3] ? (
-                        {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, 2'b00, proc_vin[3:2]}
-                    ) : {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, 2'b00, proc_vin[3:2]};
+                        {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2w, csr_mindrv, proc_vin[3:2]}
+                    ) : {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2b, csr_mindrv, proc_vin[3:2]};
                 end
                 else begin
                     proc_output = pixel_prev[1] ? `DRIVE_WHITE : `DRIVE_BLACK;
                     // Pixel didn't change, continue
-                    if (pixel_framecnt == 1) begin
+                    if (pixel_framecnt == 0) begin
                         proc_bo = {proc_bi[15:12], STAGE_HOLD, FASTG_HOLDOFF_FRAMES, proc_bi[3:0]};
                     end
                     else begin
-                        proc_bo = {proc_bi[15:10], pixel_framecnt_dec, proc_bi[3:0]};
+                        proc_bo = {proc_bi[15:10], pixel_framecnt_dec, pixel_mindrv_dec, proc_bi[1:0]};
                     end
                 end
             end
@@ -396,8 +430,8 @@ module pixel_processing(
                     // Pixel state changed
                     proc_output = drive_towards_input;
                     proc_bo = proc_vin[3] ? (
-                        {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, 2'b00, proc_vin[3:2]}
-                    ) : {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, 2'b00, proc_vin[3:2]};
+                        {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, csr_mindrv, proc_vin[3:2]}
+                    ) : {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, csr_mindrv, proc_vin[3:2]};
                 end
                 else begin
                     // Pixel state not changed
@@ -437,8 +471,8 @@ module pixel_processing(
                     // Pixel state changed
                     proc_output = drive_towards_input;
                     proc_bo = proc_vin[3] ? (
-                        {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, 2'b00, proc_vin[3:2]}
-                    ) : {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, 2'b00, proc_vin[3:2]};
+                        {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, csr_mindrv, proc_vin[3:2]}
+                    ) : {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, csr_mindrv, proc_vin[3:2]};
                 end
                 else begin
                     // Pixel state not changed
@@ -459,17 +493,17 @@ module pixel_processing(
             `SETMODE_MANUAL_LUT_ERROR_DIFFUSION:
                 proc_bo = {MODE_MANUAL_LUT_ERROR_DIFFUSION, 4'd0, 6'd0, 4'd15};
             `SETMODE_FAST_MONO_NO_DITHER:
-                proc_bo = {MODE_FAST_MONO_NO_DITHER, 2'b0, 6'd0, 3'b0, 1'b1};
+                proc_bo = `INIT_FAST_MONO_ND;
             `SETMODE_FAST_MONO_BAYER:
-                proc_bo = {MODE_FAST_MONO_BAYER, 2'b0, 6'd0, 3'b0, 1'b1};
+                proc_bo = `INIT_FAST_MONO_BD;
             `SETMODE_FAST_MONO_BLUE_NOISE:
-                proc_bo = {MODE_FAST_MONO_BLUE_NOISE, 2'b0, 6'd0, 3'b0, 1'b1};
+                proc_bo = `INIT_FAST_MONO_BN;
             `SETMODE_FAST_GREY:
-                proc_bo = {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'b0, 2'b11};
+                proc_bo = `INIT_FAST_GREY;
             `SETMODE_AUTO_LUT_NO_DITHER:
-                proc_bo = {MODE_AUTO_LUT_NO_DITHER, 4'd0, 4'd15, 4'd0};
+                proc_bo = `INIT_AUTO_LUT_ND;
             `SETMODE_AUTO_LUT_BLUE_NOISE:
-                proc_bo = {MODE_AUTO_LUT_BLUE_NOISE, 4'd0, 4'd15, 4'd0};
+                proc_bo = `INIT_AUTO_LUT_OD;
             default: begin
                 // Invalid input detected, default back to manual lut
                 proc_bo = {MODE_MANUAL_LUT_NO_DITHER, 4'd0, 6'd0, 4'd15};

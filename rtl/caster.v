@@ -73,7 +73,7 @@ module caster(
     parameter SIMULATION = "TRUE";
 
     // Features
-    parameter ENABLE_ERROR_DIFFUSION = "TRUE";
+    parameter ENABLE_ERROR_DIFFUSION = "FALSE";
 
     // Output logic
     localparam SCAN_IDLE = 2'd0;
