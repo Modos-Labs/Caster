@@ -60,7 +60,7 @@ This project is an EPD controller, meaning that it would only work with screens 
 The following is a list of screens tested and working:
 
 - ED060SCQ (6" 800x600 Pearl)
-- ED060XC3 (6" 1024x758 Carta)
+- ED060XC3 (6" 1024x758 Pearl)
 - ED060XC8 (6" 1024x758 Carta)
 - ED060KD4 (6" 1448x1072 Carta)
 - GDEW060M01 (6" 1448x1072 DES)
