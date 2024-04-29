@@ -19,79 +19,33 @@ module vin_internal(
     output reg          v_hsync, // active high
     output wire         v_pclk,
     output reg          v_de, // active high
-    output reg  [15:0]  v_pixel // 2 pixels per clock, Y8
-);
-    
-    // 33MHz to ~81MHz PLL (162MHz standard UXGA 60Hz timing)
-    wire clkfbout;
-    wire clkout0;
-    wire pll_locked;
-    
-    PLL_BASE #(
-        .BANDWIDTH              ("OPTIMIZED"),
-        .CLK_FEEDBACK           ("CLKFBOUT"),
-        .COMPENSATION           ("INTERNAL"),
-        .DIVCLK_DIVIDE          (1),
-        .CLKFBOUT_MULT          (17),
-        .CLKFBOUT_PHASE         (0.000),
-        .CLKOUT0_DIVIDE         (7),
-        .CLKOUT0_PHASE          (0.000),
-        .CLKOUT0_DUTY_CYCLE     (0.500),
-        .CLKIN_PERIOD           (30.003),
-        .REF_JITTER             (0.010))
-    pll_base_inst (
-        // Output clocks
-        .CLKFBOUT              (clkfbout),
-        .CLKOUT0               (clkout0),
-        .CLKOUT1               (),
-        .CLKOUT2               (),
-        .CLKOUT3               (),
-        .CLKOUT4               (),
-        .CLKOUT5               (),
-        // Status and control signals
-        .LOCKED                (pll_locked),
-        .RST                   (1'b0),
-         // Input clock control
-        .CLKFBIN               (clkfbout),
-        .CLKIN                 (clk));
-
-    BUFG pclk_buf (
-        .O(v_pclk),
-        .I(clkout0));
-
-    reg locked = 1'b0;
-    reg v_rst = 1'b0;
-    always @(posedge v_pclk) begin
-        if ((!locked) && (pll_locked)) begin
-            v_rst <= 1'b1;
-        end
-        else begin
-            v_rst <= 1'b0;
-        end
-        locked <= pll_locked;
-    end
+    output wire [31:0]  v_pixel // 4 pixels per clock, Y8
+); 
+    assign v_pclk = clk;
+    assign v_rst = rst;
+    // TODO: Use settings from register file
 
 //`define UXGA
 `define SQCIF
 
 `ifdef UXGA
     // Horizontal
-    // All numbers are divided by 2
-    parameter H_FP    = 32;  //Front porch
-    parameter H_SYNC  = 96;  //Sync
-    parameter H_BP    = 152; //Back porch
-    parameter H_ACT   = 800; //Active pixels
+    // All numbers are divided by 4
+    parameter H_FP    = 2;   //Front porch
+    parameter H_SYNC  = 8;   //Sync
+    parameter H_BP    = 10;  //Back porch
+    parameter H_ACT   = 400; //Active pixels
     // Vertical
-    parameter V_FP    = 1;    //Front porch
-    parameter V_SYNC  = 3;    //Sync
-    parameter V_BP    = 46;   //Back porch
+    parameter V_FP    = 21;   //Front porch
+    parameter V_SYNC  = 8;    //Sync
+    parameter V_BP    = 6;    //Back porch
     parameter V_ACT   = 1200; //Active lines
 `elsif SQCIF
     // This is for simualtion only
-    parameter H_FP    = 4;
-    parameter H_SYNC  = 6;
-    parameter H_BP    = 8;
-    parameter H_ACT   = 64;
+    parameter H_FP    = 2;
+    parameter H_SYNC  = 3;
+    parameter H_BP    = 4;
+    parameter H_ACT   = 32;
     parameter V_FP    = 1;
     parameter V_SYNC  = 3;
     parameter V_BP    = 6;
@@ -151,14 +105,7 @@ module vin_internal(
     wire hs = ((h_count > H_FP) && (h_count <= H_FP + H_SYNC));
     wire vs = ((v_count > V_FP) && (v_count <= V_FP + V_SYNC));
     
-    wire [15:0] pixel =
-        (frame_count < 9'd120) ? (
-        ((x[0] ^ y[1]) ? 16'hFFFF : 16'h0000)) : (
-        (frame_count < 9'd240) ? (
-        ((x[1] ^ y[2]) ? 16'hFFFF : 16'h0000)) : (
-        (frame_count < 9'd360) ? (
-        ((x[2] ^ y[3]) ? 16'hFFFF : 16'h0000)) : (
-        ((x[3] ^ y[4]) ? 16'hFFFF : 16'h0000))));
+    assign v_pixel = 32'hFFFFFFFF;
     
     // Buffer signal through DFF
     always @(posedge v_pclk) begin
@@ -166,13 +113,11 @@ module vin_internal(
             v_hsync <= 1'b0;
             v_vsync <= 1'b0;
             v_de <= 1'b0;
-            v_pixel <= 16'h0000;
         end
         else begin
             v_hsync <= hs;
             v_vsync <= vs;
             v_de <= de;
-            v_pixel <= pixel;
         end
     end
 

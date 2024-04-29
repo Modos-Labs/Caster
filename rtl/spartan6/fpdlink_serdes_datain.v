@@ -25,20 +25,34 @@ module fpdlink_serdes_datain(
     output wire incdec     // Master ISERDES phase detector result output
     );
 
+    parameter INVERT = 1'b0;
+
     wire ddly_m;    // Master IODELAY output
     wire ddly_s;    // Slave IODELAY output
     wire iob_din;   // Signal after IBUFDS
     wire cascade;   // Master ISERDES cascade output
     wire pd_edge;   // Slave ISERDES cascade output
     
-    IBUFDS #(
-        .DIFF_TERM("TRUE")
-    )
-    ibufds (
-        .I(dat_p),
-        .IB(dat_n),
-        .O(iob_din)
-    );
+    generate if (INVERT == 1'b0) begin
+        IBUFDS #(
+            .DIFF_TERM("TRUE")
+        )
+        ibufds (
+            .I(dat_p),
+            .IB(dat_n),
+            .O(iob_din)
+        );
+    else begin
+        IBUFDS_DIFF_OUT #(
+            .DIFF_TERM("TRUE")
+        )
+        ibufds (
+            .I(dat_p),
+            .IB(dat_n),
+            .O(),
+            .OB(iob_din)
+        );
+    end endgenerate
     
     IODELAY2 #(
         .DATA_RATE("SDR"),
