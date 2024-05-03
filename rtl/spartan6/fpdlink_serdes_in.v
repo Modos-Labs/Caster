@@ -3,7 +3,7 @@
 // This file is not covered under CERN-OHL-P.
 `timescale 1ns / 1ps
 `default_nettype none
-module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
+module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, halfgclk, dout);
     
     // Possible values:
     // 3: 18bpp single channel
@@ -11,6 +11,8 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
     // 6: 18bpp dual channel
     // 8: 24bpp dual channel
     parameter integer LANES = 6;
+    parameter CLK_INVERT = 1'b0;
+    parameter CH_INVERT = 6'b000000;
     
     input  wire                 rstin;
     output wire                 rst;
@@ -19,6 +21,7 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
     input  wire [LANES-1:0]     dp;
     input  wire [LANES-1:0]     dn;
     output wire                 gclk;   // Fabric clock, at pixel clock rate
+    output wire                 halfgclk; // Unbuffered half rate fabric clock
     output wire [LANES*7-1:0]   dout;   // Data output
     
     wire             cal_m;     // Master IODELAY calibration enable
@@ -37,7 +40,9 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
     // SerDes block bit slip enable
     wire bitslip;
 
-    fpdlink_serdes_clkin fpdlink_serdes_clkin (
+    fpdlink_serdes_clkin #(
+        .INVERT(CLK_INVERT)
+    ) fpdlink_serdes_clkin (
         .rstin(rstin),
         .rst(rst),
         .clk_p(cp),
@@ -45,6 +50,7 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
         .ioclk(ioclk),
         .serdes_strobe(serdes_strobe),
         .gclk(gclk),
+        .halfgclk(halfgclk),
         .bitslip(bitslip)
     );
     
@@ -52,6 +58,7 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
     generate
     for (i = 0; i < LANES; i = i + 1)
     begin
+        wire [6:0] serdes_dout;
         fpdlink_serdes_datain fpdlink_serdes_datain (
             // Clock and reset
             .gclk(gclk),
@@ -62,7 +69,7 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
             .ioclk(ioclk),
             .serdes_strobe(serdes_strobe),
             .bitslip(bitslip),
-            .dout(dout[(LANES - 1 - i)*7+6 -: 7]),
+            .dout(serdes_dout),
             // Phase detector interface
             .cal_m(cal_m),
             .cal_s(cal_s),
@@ -73,6 +80,8 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, dout);
             .valid(valid[i]),
             .incdec(incdec[i])
         );
+        assign dout[(LANES - 1 - i)*7+6 -: 7] =
+            CH_INVERT[i] ? ~serdes_dout : serdes_dout;
     end
     endgenerate
     

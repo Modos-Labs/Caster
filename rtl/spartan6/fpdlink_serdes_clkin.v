@@ -11,14 +11,17 @@ module fpdlink_serdes_clkin(
     output wire ioclk,          // IO clock for SerDes blocks
     output wire serdes_strobe,  // Strobe for SerDes blocks
     output wire gclk,           // Buffered fabric clock
+    output wire halfgclk,       // Unbuffered half GCLK
     output reg  bitslip         // Bitslip output
     );
     
     parameter DIFF_TERM = "TRUE"; // Intenal differential termination
     parameter CLK_PERIOD = 12.345; // Input clock period, 12.345ns = 81MHz
+    parameter INVERT = 1'b0;
 
     wire rxclk_in;
     
+//    generate if (INVERT == 1'b0) begin
     IBUFGDS #(
         .DIFF_TERM(DIFF_TERM)
     )
@@ -27,6 +30,18 @@ module fpdlink_serdes_clkin(
         .IB(clk_n),
         .O(rxclk_in)
     );
+//    end else begin
+//    // Inverting
+//    IBUFGDS_DIFF_OUT #(
+//        .DIFF_TERM(DIFF_TERM)
+//    )
+//    ibufgds_clkin (
+//        .I(clk_p),
+//        .IB(clk_n),
+//        .O(),
+//        .OB(rxclk_in)
+//    );
+//    end endgenerate
     
     wire rxpll_locked;
     wire gclk_pll;
@@ -51,7 +66,7 @@ module fpdlink_serdes_clkin(
         .CLKOUT2_DIVIDE(7),
         .CLKOUT2_DUTY_CYCLE(0.5),
         .CLKOUT2_PHASE(0.0),
-        .CLKOUT3_DIVIDE(7),
+        .CLKOUT3_DIVIDE(14),
         .CLKOUT3_DUTY_CYCLE(0.5),
         .CLKOUT3_PHASE(0.0),
         .CLKOUT4_DIVIDE(7),
@@ -71,7 +86,7 @@ module fpdlink_serdes_clkin(
         .CLKOUT0(ioclk_pll),
         .CLKOUT1(),
         .CLKOUT2(gclk_pll),
-        .CLKOUT3(),
+        .CLKOUT3(halfgclk),
         .CLKOUT4(),
         .CLKOUT5(),
         .CLKOUTDCM0(),
@@ -206,7 +221,8 @@ module fpdlink_serdes_clkin(
     
     wire serdes_pd_edge; // Slave -> Master
     wire serdes_cascade; // Master -> Slave
-    wire [6:0] dout;
+    wire [6:0] dout_raw;
+    wire [6:0] dout = (INVERT == 1'b1) ? ~dout_raw : dout;
     
     ISERDES2 #(
         .DATA_WIDTH(7),
@@ -229,10 +245,10 @@ module fpdlink_serdes_clkin(
         .DFB(),
         .CFB0(),
         .CFB1(),
-        .Q4(dout[0]),
-        .Q3(dout[1]),
-        .Q2(dout[2]),
-        .Q1(dout[3]),
+        .Q4(dout_raw[0]),
+        .Q3(dout_raw[1]),
+        .Q2(dout_raw[2]),
+        .Q1(dout_raw[3]),
         .VALID(),
         .INCDEC(),
         .SHIFTOUT(serdes_cascade)
@@ -259,9 +275,9 @@ module fpdlink_serdes_clkin(
         .DFB(pclk),
         .CFB0(fbclk),
         .CFB1(),
-        .Q4(dout[4]),
-        .Q3(dout[5]),
-        .Q2(dout[6]),
+        .Q4(dout_raw[4]),
+        .Q3(dout_raw[5]),
+        .Q2(dout_raw[6]),
         .Q1(),
         .VALID(),
         .INCDEC(),

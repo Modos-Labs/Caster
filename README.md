@@ -2,7 +2,7 @@
 
 The Caster is a open-source FPGA-based low-latency electrophoretics display controller (EPDC) design that can be embedded into multiple different classes of devices.
 
-Also checkout the [Glider](https://github.com/Modos-Labs/Glider), which is the reference monitor hardware and firmware design incorporating the Caster EPDC.
+Also checkout the [Glider](https://gitlab.com/zephray/Glider), which is the reference monitor hardware and firmware design incorporating the Caster EPDC.
 
 ![block-diagram](blockdiagram.svg)
 

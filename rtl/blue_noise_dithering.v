@@ -1,4 +1,4 @@
-// Copyright Modos / Wenting Zhang 2024
+// Copyright Wenting Zhang 2024
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-P v2
 //

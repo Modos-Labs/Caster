@@ -1,4 +1,4 @@
-// Copyright Modos / Wenting Zhang 2024
+// Copyright Wenting Zhang 2024
 //
 // This source describes Open Hardware and is licensed under the CERN-OHL-P v2
 //
@@ -43,7 +43,7 @@ module caster(
     output wire         epd_sdclk,
     output wire         epd_sdle,
     output wire         epd_sdoe,
-    output wire [7:0]   epd_sd,
+    output wire [15:0]  epd_sd,
     output wire         epd_sdce0,
     // CSR SPI interface
     input  wire         spi_cs,
@@ -629,6 +629,57 @@ module caster(
     assign bo_valid = s5_active;
 
     // End of pipeline
+    wire clk_en = (scan_in_hfp || scan_in_hsync || scan_in_hact);
+
+`ifdef OUTPUT_16B
+    reg out_clk;
+    reg [7:0] last_pix;
+    reg [15:0] out_sd;
+    reg out_sdce;
+    always @(posedge clk) begin
+        if (clk_en) begin
+            out_clk <= ~out_clk;
+        end
+        else begin
+            out_clk <= 1'b0;
+        end
+        if (out_clk) begin
+            // next edge is falling edge, output data
+            out_sd <= {last_pix, current_pixel};
+            out_sdce <= !scan_in_act;
+        end
+        else begin
+            // next edge is rising edge, buffer data
+            last_pix <= current_pixel;
+        end
+    end
+    assign epd_sdclk = out_clk;
+    assign epd_sd = out_sd;
+    assign epd_sdce0 = out_sdce;
+`else
+    // Clock output
+    
+    // Glithcy output, should use clock gating cell
+    // assign epd_sdclk = clk_en ? ~clk : 1'b0;
+    // SPARTAN-6 specific output
+    ODDR2 #(
+        .DDR_ALIGNMENT("NONE"),
+        .INIT(1'b0),
+        .SRTYPE("SYNC")
+    ) sdclk_oddr (
+        .Q(epd_sdclk),
+        .C0(clk),
+        .C1(!clk),
+        .CE(1'b1),
+        .D0(1'b0),
+        .D1(1'b1),
+        .R(1'b0),
+        .S(1'b0)
+    );
+
+    assign epd_sd = current_pixel;
+    assign epd_sdce0 = (scan_in_act) ? 1'b0 : 1'b1;
+`endif
 
     // mode
     assign epd_gdoe = (scan_in_vsync || scan_in_vbp || scan_in_vact) ? 1'b1 : 1'b0;
@@ -643,11 +694,10 @@ module caster(
     assign epd_gdsp = (scan_in_vsync) ? 1'b0 : 1'b1;
     assign epd_sdoe = epd_gdoe;
 
-    assign epd_sd = current_pixel;
+    
     // stl
-    assign epd_sdce0 = (scan_in_act) ? 1'b0 : 1'b1;
+    
     assign epd_sdle = (scan_in_hsync) ? 1'b1 : 1'b0;
-    assign epd_sdclk = (scan_in_hfp || scan_in_hsync || scan_in_hact) ? ~clk : 1'b0;
 
     assign b_trigger = (scan_state == SCAN_WAITING);
 
