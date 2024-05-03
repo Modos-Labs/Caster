@@ -58,9 +58,8 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, halfgclk, dout);
     generate
     for (i = 0; i < LANES; i = i + 1)
     begin
-        fpdlink_serdes_datain #(
-            .INVERT(CH_INVERT[i])
-        ) fpdlink_serdes_datain (
+        wire [6:0] serdes_dout;
+        fpdlink_serdes_datain fpdlink_serdes_datain (
             // Clock and reset
             .gclk(gclk),
             .rst(rst),
@@ -70,7 +69,7 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, halfgclk, dout);
             .ioclk(ioclk),
             .serdes_strobe(serdes_strobe),
             .bitslip(bitslip),
-            .dout(dout[(LANES - 1 - i)*7+6 -: 7]),
+            .dout(serdes_dout),
             // Phase detector interface
             .cal_m(cal_m),
             .cal_s(cal_s),
@@ -81,6 +80,8 @@ module fpdlink_serdes_in(rstin, rst, cp, cn, dp, dn, gclk, halfgclk, dout);
             .valid(valid[i]),
             .incdec(incdec[i])
         );
+        assign dout[(LANES - 1 - i)*7+6 -: 7] =
+            CH_INVERT[i] ? ~serdes_dout : serdes_dout;
     end
     endgenerate
     

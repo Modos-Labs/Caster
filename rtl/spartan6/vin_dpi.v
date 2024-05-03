@@ -34,6 +34,11 @@ module vin_dpi(
     wire clkfb;
     wire clk0;
     wire clkfx;
+    wire dpi_pclk_buf;
+    IBUFG pclkin_buf (
+        .O (dpi_pclk_buf),
+        .I (dpi_pclk)
+    );
 
     DCM_SP #(
         .CLKDV_DIVIDE          (2.000),
@@ -49,7 +54,7 @@ module vin_dpi(
     )
     dcm_sp_inst (
         // Input clock
-        .CLKIN                 (clk_in_buffered),
+        .CLKIN                 (dpi_pclk_buf),
         .CLKFB                 (clkfb),
         // Output clocks
         .CLK0                  (clk0),
@@ -85,7 +90,7 @@ module vin_dpi(
 
     // Register all inputs first
     wire pclk = clk0;
-    reg hsync, vsync, de
+    reg hsync, vsync, de;
     reg [23:0] pixelin;
     always @(posedge pclk) begin
         hsync <= dpi_hsync;
@@ -102,8 +107,8 @@ module vin_dpi(
     reg [23:0] pixbuf;
     reg last_de, last_vsync;
     
-    always @(posedge pclk or posedge rst_out) begin
-        if (rst_out) begin
+    always @(posedge pclk or posedge vi_rst) begin
+        if (vi_rst) begin
             v_pclk <= 1'b0;
             v_de <= 1'b0;
             ignore <= 2'd3; // ignore first few frames
@@ -132,3 +137,4 @@ module vin_dpi(
     end
 
 endmodule
+`default_nettype wire

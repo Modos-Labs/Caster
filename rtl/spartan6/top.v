@@ -82,6 +82,8 @@ module top(
     
     wire clk_ddr;
     wire mif_rst;
+    
+    wire clk_epdc;
 
     reg c3_sys_rst = 1'b1;
     always @(posedge clk_sys) begin
@@ -384,7 +386,7 @@ module top(
         .epd_sdclk(EPD_SDCLK),
         .epd_sdle(EPD_SDLE),
         .epd_sdoe(EPD_SDOE),
-        .epd_sd(EPD_SD[7:0]),
+        .epd_sd(EPD_SD),
         .epd_sdce0(EPD_SDCE0),
         // CSR interface
         .spi_cs(spi_cs),
@@ -405,56 +407,54 @@ module top(
     );
     
     // Debug
-    wire [35:0] chipscope_control0;
-    chipscope_icon icon (
-        .CONTROL0(chipscope_control0) // INOUT BUS [35:0]
-    );
-    
-    wire [31:0] ila_signals;
-    chipscope_ila ila (
-        .CONTROL(chipscope_control0), // INOUT BUS [35:0]
-        .CLK(clk_mif),
-        .TRIG0(ila_signals)
-    );
-
-    assign ila_signals[0] = pll_locked;
-    assign ila_signals[1] = ddr_calib_done;
-    assign ila_signals[2] = sys_rst;
-    assign ila_signals[3] = memif_error;
-    assign ila_signals[4] = v_vs;
-    assign ila_signals[5] = v_hs;
-    assign ila_signals[6] = v_de;
-//    assign ila_signals[7] = v_pclk;
-//    assign ila_signals[8] = dbg_hsync;
-//    assign ila_signals[9] = dbg_vsync;
-//    assign ila_signals[10] = dbg_de;
-//    assign ila_signals[11] = dbg_pll_lck;
-    
-    assign ila_signals[7] = vin_ready; // vi_fifo_rd_en
-    assign ila_signals[8] = vin_valid; // vi_fifo_rd not empty
-    assign ila_signals[9] = memif_enable;
-    assign ila_signals[10] = memif_trigger;
-    assign ila_signals[11] = pix_read_valid; // bi_fifo_wr_en
-    assign ila_signals[12] = bi_fifo_full;
-    assign ila_signals[13] = bi_ready;
-    assign ila_signals[14] = bi_valid; // bi_fifo_rd not empty
-    assign ila_signals[15] = bo_valid;
-    assign ila_signals[16] = bo_fifo_full;
-    assign ila_signals[17] = pix_write_ready; // bo_fifo_rd_en
-    assign ila_signals[18] = bo_fifo_empty;
-    //assign ila_signals[19] = dbg_scan_state[0];
-    assign ila_signals[19] = dbg_scan_state[1];
-    //assign ila_signals[15] = vin_vsync;
-    assign ila_signals[20] = vin_pixel[15]; // sneak peak of pixel
-
-    assign ila_signals[21] = spi_cs;
-    assign ila_signals[22] = spi_sck;
-    assign ila_signals[23] = spi_mosi;
-    
-    assign ila_signals[31:24] = dbg_scan_v_cnt[7:0];
-    //assign ila_signals[31:21] = dbg_scan_v_cnt;
-    
-    assign EPD_SD[15:8] = EPD_SD[7:0];
+//    wire [35:0] chipscope_control0;
+//    chipscope_icon icon (
+//        .CONTROL0(chipscope_control0) // INOUT BUS [35:0]
+//    );
+//    
+//    wire [31:0] ila_signals;
+//    chipscope_ila ila (
+//        .CONTROL(chipscope_control0), // INOUT BUS [35:0]
+//        .CLK(clk_mif),
+//        .TRIG0(ila_signals)
+//    );
+//
+//    assign ila_signals[0] = pll_locked;
+//    assign ila_signals[1] = ddr_calib_done;
+//    assign ila_signals[2] = sys_rst;
+//    assign ila_signals[3] = memif_error;
+//    assign ila_signals[4] = v_vs;
+//    assign ila_signals[5] = v_hs;
+//    assign ila_signals[6] = v_de;
+////    assign ila_signals[7] = v_pclk;
+////    assign ila_signals[8] = dbg_hsync;
+////    assign ila_signals[9] = dbg_vsync;
+////    assign ila_signals[10] = dbg_de;
+////    assign ila_signals[11] = dbg_pll_lck;
+//    
+//    assign ila_signals[7] = vin_ready; // vi_fifo_rd_en
+//    assign ila_signals[8] = vin_valid; // vi_fifo_rd not empty
+//    assign ila_signals[9] = memif_enable;
+//    assign ila_signals[10] = memif_trigger;
+//    assign ila_signals[11] = pix_read_valid; // bi_fifo_wr_en
+//    assign ila_signals[12] = bi_fifo_full;
+//    assign ila_signals[13] = bi_ready;
+//    assign ila_signals[14] = bi_valid; // bi_fifo_rd not empty
+//    assign ila_signals[15] = bo_valid;
+//    assign ila_signals[16] = bo_fifo_full;
+//    assign ila_signals[17] = pix_write_ready; // bo_fifo_rd_en
+//    assign ila_signals[18] = bo_fifo_empty;
+//    //assign ila_signals[19] = dbg_scan_state[0];
+//    assign ila_signals[19] = dbg_scan_state[1];
+//    //assign ila_signals[15] = vin_vsync;
+//    assign ila_signals[20] = vin_pixel[15]; // sneak peak of pixel
+//
+//    assign ila_signals[21] = spi_cs;
+//    assign ila_signals[22] = spi_sck;
+//    assign ila_signals[23] = spi_mosi;
+//    
+//    assign ila_signals[31:24] = dbg_scan_v_cnt[7:0];
+//    //assign ila_signals[31:21] = dbg_scan_v_cnt;
 
 endmodule
 `default_nettype wire

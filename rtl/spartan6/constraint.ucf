@@ -9,14 +9,11 @@ NET "CLK_IN"        LOC = "N8";
 NET "CLK_IN"        TNM_NET = "CLK33";
 TIMESPEC "TS_CLK33" = PERIOD "CLK33" 30 ns HIGH 50 %;
 
-NET "vin_dvi/dvi_serdes_in/rxclk" TNM_NET = DVI_CLOCK1;
-TIMESPEC TS_DVI_CLOCK1 = PERIOD "DVI_CLOCK1" 105 MHz HIGH 50%;
+NET "vin/vin_fpdlink/fpdlink_serdes_in/fpdlink_serdes_clkin/pclk_bufio" TNM_NET = LVDS_CLK;
+TIMESPEC TS_LVDS_CLK = PERIOD "LVDS_CLK" 81 MHz HIGH 50%;
 
-NET "v_pclk" TNM_NET = "pclk";
-TIMESPEC "ts_pclk" = PERIOD "pclk" 15ns HIGH 50 %;
-
-NET "clk_epdc_BUFG" TNM_NET = "clkepdc";
-TIMESPEC "ts_clkepdc" = PERIOD "clkepdc" 30ns HIGH 50 %;
+NET "vin/vin_dpi/dpi_pclk_buf" TNM_NET = DPI_CLK;
+TIMESPEC TS_DPI_CLK = PERIOD "DPI_CLK" 162 MHz HIGH 50%;
 
 #NET "mif_rst" TIG;
 
@@ -158,7 +155,7 @@ NET "EPD_SD[6]"     LOC = "T13";
 NET "EPD_SD[7]"     LOC = "R12";
 NET "EPD_SD[8]"     LOC = "T12";
 NET "EPD_SD[9]"     LOC = "K16";
-NET "EPD_SD[10]"    LOC = "J14";
+NET "EPD_SD[10]"    LOC = "K14";
 NET "EPD_SD[11]"    LOC = "K15";
 NET "EPD_SD[12]"    LOC = "L16";
 NET "EPD_SD[13]"    LOC = "M15";
@@ -194,11 +191,11 @@ NET "LVDS_ODD_N[*]"  DIFF_TERM = "TRUE";
 NET "LVDS_ODD_P[0]"  LOC = "E7";
 NET "LVDS_ODD_N[0]"  LOC = "E8";
 # ODD B is inverted
-NET "LVDS_ODD_P[1]"  LOC = "C13";
-NET "LVDS_ODD_N[1]"  LOC = "A13";
+NET "LVDS_ODD_P[1]"  LOC = "B8";
+NET "LVDS_ODD_N[1]"  LOC = "A8";
 # ODD C is not inverted
-NET "LVDS_ODD_N[2]"  LOC = "F9";
-NET "LVDS_ODD_P[2]"  LOC = "D9";
+NET "LVDS_ODD_P[2]"  LOC = "F9";
+NET "LVDS_ODD_N[2]"  LOC = "D9";
 
 NET "LVDS_EVEN_P[*]" IOSTANDARD = LVDS_33;
 NET "LVDS_EVEN_P[*]" DIFF_TERM = "TRUE";
@@ -206,11 +203,11 @@ NET "LVDS_EVEN_N[*]" IOSTANDARD = LVDS_33;
 NET "LVDS_EVEN_N[*]" DIFF_TERM = "TRUE";
 
 # EVEN A is inverted
-NET "LVDS_EVEN_P[0]" LOC = "E7";
-NET "LVDS_EVEN_N[0]" LOC = "E8";
+NET "LVDS_EVEN_P[0]" LOC = "D11";
+NET "LVDS_EVEN_N[0]" LOC = "D12";
 # EVEN B is inverted
-NET "LVDS_EVEN_P[1]" LOC = "A13";
-NET "LVDS_EVEN_N[1]" LOC = "C13";
+NET "LVDS_EVEN_P[1]" LOC = "C13";
+NET "LVDS_EVEN_N[1]" LOC = "A13";
 # EVEN C is not inverted
 NET "LVDS_EVEN_P[2]" LOC = "B14";
 NET "LVDS_EVEN_N[2]" LOC = "A14";
@@ -224,7 +221,7 @@ NET "DPI_VSYNC"     IOSTANDARD = LVCMOS33;
 NET "DPI_VSYNC"     LOC = "K12";
 NET "DPI_HSYNC"     IOSTANDARD = LVCMOS33;
 NET "DPI_HSYNC"     LOC = "J11";
-NET "DPI_PIXEL[*]"  IOSTANDARD = TMDS_33;
+NET "DPI_PIXEL[*]"  IOSTANDARD = LVCMOS33;
 NET "DPI_PIXEL[0]"  LOC = "J13"; # B0
 NET "DPI_PIXEL[1]"  LOC = "J14"; # B1
 NET "DPI_PIXEL[2]"  LOC = "H11"; # B2

@@ -12,7 +12,11 @@
 // FPD-Link I video input
 `timescale 1ns / 1ps
 `default_nettype none
-module vin_fpdlink(
+module vin_fpdlink #(
+    parameter integer LANES = 6,
+    parameter CLK_INVERT = 1'b0,
+    parameter CH_INVERT = 6'b000000
+) (
     input  wire         rst,
     input  wire         fpdlink_cp,
     input  wire         fpdlink_cn,
@@ -28,14 +32,17 @@ module vin_fpdlink(
     output wire         v_halfpclk,
     output wire         v_valid
 );
-    parameter COLORMODE = "DES";
 
     wire gclk;
     wire [41:0] fpdlink_din_unreg;
     reg [41:0] fpdlink_din;
     wire vi_rst;
 
-    fpdlink_serdes_in fpdlink_serdes_in (
+    fpdlink_serdes_in #(
+        .LANES(LANES),
+        .CLK_INVERT(CLK_INVERT),
+        .CH_INVERT(CH_INVERT)
+    ) fpdlink_serdes_in (
         .rstin(rst),
         .rst(vi_rst),
         .cp(fpdlink_cp),
@@ -96,7 +103,7 @@ module vin_fpdlink(
         b_odd, 2'b0
     };
 
-    assign v_valid = vi_rst;
+    assign v_valid = !vi_rst;
     
 endmodule
 `default_nettype wire
