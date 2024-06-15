@@ -682,7 +682,8 @@ module caster(
 `endif
 
     // mode
-    assign epd_gdoe = (scan_in_vsync || scan_in_vbp || scan_in_vact) ? 1'b1 : 1'b0;
+    //assign epd_gdoe = (scan_in_vsync || scan_in_vbp || scan_in_vact) ? 1'b1 : 1'b0;
+    assign epd_gdoe = 1'b1;
     // ckv
     wire epd_gdclk_pre = (scan_in_hsync || scan_in_hbp || scan_in_hact) ? 1'b1 : 1'b0;
     reg epd_gdclk_delay;
@@ -692,8 +693,8 @@ module caster(
 
     // spv
     assign epd_gdsp = (scan_in_vsync) ? 1'b0 : 1'b1;
-    assign epd_sdoe = epd_gdoe;
-
+    //assign epd_sdoe = epd_gdoe;
+    assign epd_sdoe = 1'b1;
     
     // stl
     

@@ -87,7 +87,7 @@ module memif(
         else begin
             case (wr_state)
             WR_IDLE: begin
-                if (vsync) begin
+                if (vsync && enable) begin
                     wr_byte_address <= 0;
                     wr_burst_count <= 0;
                     wr_state <= WR_PUSH;

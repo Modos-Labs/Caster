@@ -10,7 +10,7 @@ NET "CLK_IN"        TNM_NET = "CLK33";
 TIMESPEC "TS_CLK33" = PERIOD "CLK33" 30 ns HIGH 50 %;
 
 NET "vin/vin_fpdlink/fpdlink_serdes_in/fpdlink_serdes_clkin/pclk_bufio" TNM_NET = LVDS_CLK;
-TIMESPEC TS_LVDS_CLK = PERIOD "LVDS_CLK" 81 MHz HIGH 50%;
+TIMESPEC TS_LVDS_CLK = PERIOD "LVDS_CLK" 100 MHz HIGH 50%;
 
 NET "vin/vin_dpi/dpi_pclk_buf" TNM_NET = DPI_CLK;
 TIMESPEC TS_DPI_CLK = PERIOD "DPI_CLK" 162 MHz HIGH 50%;

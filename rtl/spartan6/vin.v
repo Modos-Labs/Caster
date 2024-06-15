@@ -33,7 +33,8 @@ module vin(
     output wire         v_pclk,
     output wire [31:0]  v_pixel, // 4 pixels per clock, Y8
     output wire         v_valid,
-    input  wire         v_ready
+    input  wire         v_ready,
+    output wire [7:0]   debug
 );
 
     wire v_fpdlink_vsync;
@@ -88,6 +89,9 @@ module vin(
         .v_halfpclk(v_dpi_halfpclk),
         .v_valid(v_dpi_valid)
     );
+    
+    assign debug[7:6] = dpi_pixel[23:22];
+    assign debug[5:4] = v_dpi_pixel[47:46];
 
     // Mux between 2 inputs into the 1:2 FIFO
     // Prioritize FPD Link Input
@@ -102,13 +106,13 @@ module vin(
 
     // Input clock mux
     wire vi_pclk;
-    /*BUFGMUX iclk_mux (
+    BUFGMUX iclk_mux (
         .S(vi_select),
         .I0(v_dpi_pclk),
         .I1(v_fpdlink_pclk),
         .O(vi_pclk)
-    );*/
-    assign vi_pclk = v_fpdlink_pclk;
+    );
+    //assign vi_pclk = v_fpdlink_pclk;
 
     // Input color mixer
     wire [15:0] vi_pixel;
@@ -122,18 +126,21 @@ module vin(
         .out_color(vi_pixel),
         .out_valid(vi_wr_en)
     );
+    
+    assign debug[3:2] = vi_pixel_rgb[47:46];
+    assign debug[1:0] = vi_pixel[15:14];
 
     // Output clock mux
-    /*BUFGMUX oclk_mux (
+    BUFGMUX oclk_mux (
         .S(vi_select),
         .I0(v_dpi_halfpclk),
         .I1(v_fpdlink_halfpclk),
         .O(v_pclk)
-    );*/
-    BUFG oclk_bufg (
+    );
+    /*BUFG oclk_bufg (
         .I(v_fpdlink_halfpclk),
         .O(v_pclk)
-    );
+    );*/
     
     vi_fifo vi_fifo (
         .rst(v_vsync), // input rst, reset at each frame

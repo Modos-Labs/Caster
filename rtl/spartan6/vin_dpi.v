@@ -107,6 +107,8 @@ module vin_dpi(
     reg [23:0] pixbuf;
     reg last_de, last_vsync;
     
+    reg [10:0] hcntr; 
+
     always @(posedge pclk or posedge vi_rst) begin
         if (vi_rst) begin
             v_pclk <= 1'b0;
@@ -122,15 +124,22 @@ module vin_dpi(
                 // re-sync when de is first high
                 pixbuf <= pixelin;
                 v_pclk <= 1'b0;
+                hcntr <= 'd0;
             end
             else begin
                 v_pclk <= 1'b1;
-                v_de <= de && !ignored;
+                if (hcntr < 'd800) begin
+                    v_de <= de && !ignored;
+                end
+                else begin
+                    v_de <= 'd0;
+                    hcntr <= hcntr + 'd1;
+                end
                 v_pixel <= {pixbuf, pixelin};
                 v_hsync <= hsync && !ignored;
                 v_vsync <= vsync && !ignored;
             end
-            
+
             last_de <= de;
             last_vsync <= vsync;
         end

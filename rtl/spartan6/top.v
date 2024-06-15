@@ -68,7 +68,7 @@ module top(
     output wire SPI_MISO
     );
     
-    parameter COLORMODE = "MONO";
+    parameter COLORMODE = "DES";
     
     parameter SIMULATION = "FALSE";
     parameter CALIB_SOFT_IP = "TRUE";
@@ -107,6 +107,7 @@ module top(
     wire [31:0] vin_pixel;
     wire vin_valid;
     wire vin_ready;
+    wire [7:0] debug;
     vin vin(
         .rst(sys_rst),
         // DPI signals
@@ -127,7 +128,8 @@ module top(
         .v_pclk(clk_epdc),
         .v_pixel(vin_pixel),
         .v_valid(vin_valid),
-        .v_ready(vin_ready)
+        .v_ready(vin_ready),
+        .debug(debug)
     );
 
     // Hardware DDR controller
@@ -360,6 +362,8 @@ module top(
         epdc_rst_sync <= sys_rst;
     end
 
+
+    wire [15:0] epd_sd_caster;
     caster #(
         .SIMULATION(SIMULATION),
         .COLORMODE(COLORMODE)
@@ -386,7 +390,7 @@ module top(
         .epd_sdclk(EPD_SDCLK),
         .epd_sdle(EPD_SDLE),
         .epd_sdoe(EPD_SDOE),
-        .epd_sd(EPD_SD),
+        .epd_sd(epd_sd_caster),
         .epd_sdce0(EPD_SDCE0),
         // CSR interface
         .spi_cs(spi_cs),
@@ -406,6 +410,9 @@ module top(
         .dbg_scan_v_cnt(dbg_scan_v_cnt)
     );
     
+//    assign EPD_SD[7:0] = epd_sd_caster[7:0];
+//    assign EPD_SD[15:8] = debug;
+    assign EPD_SD = epd_sd_caster;
     // Debug
 //    wire [35:0] chipscope_control0;
 //    chipscope_icon icon (
