@@ -24,7 +24,7 @@ module vin_dpi(
     output reg          v_hsync,
     output reg          v_pclk,
     output reg          v_de,
-    output reg  [47:0]  v_pixel,
+    output reg  [35:0]  v_pixel,
     output wire         v_halfpclk,
     output wire         v_valid
 );
@@ -91,7 +91,7 @@ module vin_dpi(
     // Register all inputs first
     wire pclk = clk0;
     reg hsync, vsync, de;
-    reg [23:0] pixelin;
+    reg [17:0] pixelin;
     always @(posedge pclk) begin
         hsync <= dpi_hsync;
         vsync <= dpi_vsync;
@@ -104,9 +104,11 @@ module vin_dpi(
 
     reg [1:0] ignore;
     wire ignored = ignore != 'd0;
-    reg [23:0] pixbuf;
+    reg [17:0] pixbuf;
     reg last_de, last_vsync;
     
+    reg [10:0] hcntr; 
+
     always @(posedge pclk or posedge vi_rst) begin
         if (vi_rst) begin
             v_pclk <= 1'b0;
@@ -122,15 +124,22 @@ module vin_dpi(
                 // re-sync when de is first high
                 pixbuf <= pixelin;
                 v_pclk <= 1'b0;
+                hcntr <= 'd0;
             end
             else begin
                 v_pclk <= 1'b1;
-                v_de <= de && !ignored;
+                if (hcntr < 'd800) begin
+                    v_de <= de && !ignored;
+                end
+                else begin
+                    v_de <= 'd0;
+                    hcntr <= hcntr + 'd1;
+                end
                 v_pixel <= {pixbuf, pixelin};
                 v_hsync <= hsync && !ignored;
                 v_vsync <= vsync && !ignored;
             end
-            
+
             last_de <= de;
             last_vsync <= vsync;
         end

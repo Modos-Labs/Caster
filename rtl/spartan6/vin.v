@@ -20,7 +20,7 @@ module vin(
     input  wire         dpi_hsync,
     input  wire         dpi_pclk,
     input  wire         dpi_de,
-    input  wire [23:0]  dpi_pixel,
+    input  wire [17:0]  dpi_pixel,
     // FPD-Link signals
     input  wire         fpdlink_cp,
     input  wire         fpdlink_cn,
@@ -33,8 +33,11 @@ module vin(
     output wire         v_pclk,
     output wire [31:0]  v_pixel, // 4 pixels per clock, Y8
     output wire         v_valid,
-    input  wire         v_ready
+    input  wire         v_ready,
+    output wire [7:0]   debug
 );
+
+    parameter COLORMODE = "MONO";
 
     wire v_fpdlink_vsync;
     wire v_fpdlink_hsync;
@@ -46,8 +49,8 @@ module vin(
 
     vin_fpdlink #(
         .LANES(6),
-        .CLK_INVERT(1'b1),
-        .CH_INVERT(6'b011011)
+        .CLK_INVERT(1'b0),
+        .CH_INVERT(6'b000000)
     ) vin_fpdlink (
         .rst(rst),
         .fpdlink_cp(fpdlink_cp),
@@ -69,7 +72,7 @@ module vin(
     wire v_dpi_hsync;
     wire v_dpi_pclk;
     wire v_dpi_de;
-    wire [47:0] v_dpi_pixel;
+    wire [35:0] v_dpi_pixel;
     wire v_dpi_halfpclk;
     wire v_dpi_valid;
 
@@ -89,31 +92,44 @@ module vin(
         .v_valid(v_dpi_valid)
     );
 
+    wire [47:0] v_dpi_pixel_rgb888 =
+            {v_dpi_pixel[35:30], v_dpi_pixel[35:34],
+            v_dpi_pixel[29:24], v_dpi_pixel[29:28],
+            v_dpi_pixel[23:18], v_dpi_pixel[23:22],
+            v_dpi_pixel[17:12], v_dpi_pixel[17:16],
+            v_dpi_pixel[11:6], v_dpi_pixel[11:10],
+            v_dpi_pixel[5:0], v_dpi_pixel[5:4]};
+    
+    assign debug[7:6] = v_dpi_pixel_rgb888[23:22];
+    assign debug[5:4] = v_dpi_pixel_rgb888[47:46];
+
     // Mux between 2 inputs into the 1:2 FIFO
     // Prioritize FPD Link Input
-    //wire vi_select = v_fpdlink_valid;
-    wire vi_select = v_fpdlink_valid; // Always use FPD Link
+    wire vi_select = v_fpdlink_valid;
+    //wire vi_select = 1'b1; // Always use FPD Link
     wire vi_vsync = vi_select ? v_fpdlink_vsync : v_dpi_vsync;
     wire vi_hsync = vi_select ? v_fpdlink_hsync : v_dpi_hsync; // HSYNC not used
     wire vi_de = vi_select ? v_fpdlink_de : v_dpi_de;
-    wire [47:0] vi_pixel_rgb = vi_select ? v_fpdlink_pixel : v_dpi_pixel;
+    wire [47:0] vi_pixel_rgb = vi_select ? v_fpdlink_pixel : v_dpi_pixel_rgb888;
     wire fifo_full;
     wire fifo_empty;
 
     // Input clock mux
     wire vi_pclk;
-    /*BUFGMUX iclk_mux (
+    BUFGMUX iclk_mux (
         .S(vi_select),
         .I0(v_dpi_pclk),
         .I1(v_fpdlink_pclk),
         .O(vi_pclk)
-    );*/
-    assign vi_pclk = v_fpdlink_pclk;
+    );
+    //assign vi_pclk = v_fpdlink_pclk;
 
     // Input color mixer
     wire [15:0] vi_pixel;
     wire vi_wr_en;
-    vin_colormixer vin_colormixer (
+    vin_colormixer #(
+        .COLORMODE(COLORMODE)
+    ) vin_colormixer (
         .clk(vi_pclk),
         .in_vsync(vi_vsync),
         .in_hsync(vi_hsync),
@@ -122,19 +138,33 @@ module vin(
         .out_color(vi_pixel),
         .out_valid(vi_wr_en)
     );
+    
+    assign debug[3:2] = vi_pixel_rgb[47:46];
+    assign debug[1:0] = vi_pixel[15:14];
 
     // Output clock mux
-    /*BUFGMUX oclk_mux (
+    BUFGMUX oclk_mux (
         .S(vi_select),
         .I0(v_dpi_halfpclk),
         .I1(v_fpdlink_halfpclk),
         .O(v_pclk)
-    );*/
-    BUFG oclk_bufg (
+    );
+    /*BUFG oclk_bufg (
         .I(v_fpdlink_halfpclk),
         .O(v_pclk)
-    );
+    );*/
     
+    wire [15:0] lr_pixel;
+    wire lr_pixel_en;
+    /*line_reverse line_reverse(
+        .clk(vi_pclk),
+        .rst(rst),
+        .pix_in(vi_pixel),
+        .pix_in_en(vi_wr_en),
+        .pix_out(lr_pixel),
+        .pix_out_en(lr_pixel_en)
+    );*/
+        
     vi_fifo vi_fifo (
         .rst(v_vsync), // input rst, reset at each frame
         // Write port

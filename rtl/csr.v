@@ -50,7 +50,11 @@ module csr(
     input wire mig_error,
     input wire mif_error,
     input wire op_busy,
-    input wire op_queue
+    input wire op_queue,
+    // Debug
+    output wire dbg_spi_req_wen,
+    output wire [7:0] dbg_spi_req_addr,
+    output wire [7:0] dbg_spi_req_wdata
     );
 
     // Uses SPI mode 3: clock high on idle,
@@ -74,6 +78,10 @@ module csr(
     wire [7:0] spi_req_rdata;
     reg [7:0] spi_req_wdata;
     wire spi_autoinc;
+    
+    assign dbg_spi_req_wen = spi_req_wen;
+    assign dbg_spi_req_addr = spi_req_addr;
+    assign dbg_spi_req_wdata = spi_req_wdata;
 
     localparam SPI_ADDR_PHASE = 1'd0;
     localparam SPI_DATA_PHASE = 1'd1;
