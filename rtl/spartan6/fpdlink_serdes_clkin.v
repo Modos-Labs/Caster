@@ -222,7 +222,7 @@ module fpdlink_serdes_clkin(
     wire serdes_pd_edge; // Slave -> Master
     wire serdes_cascade; // Master -> Slave
     wire [6:0] dout_raw;
-    wire [6:0] dout = (INVERT == 1'b1) ? ~dout_raw : dout;
+    wire [6:0] dout = (INVERT == 1'b1) ? ~dout_raw : dout_raw;
     
     ISERDES2 #(
         .DATA_WIDTH(7),

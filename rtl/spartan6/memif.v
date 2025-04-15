@@ -54,7 +54,7 @@ module memif(
     );
 
     localparam BYTE_PER_WORD = 16; // 128 bit bus
-    localparam BURST_LENGTH = 8; // Should be at least 2
+    localparam BURST_LENGTH = 16; // Should be at least 2
     localparam BYTE_PER_CMD = BYTE_PER_WORD * BURST_LENGTH;
 
     // WR state machine
@@ -87,7 +87,7 @@ module memif(
         else begin
             case (wr_state)
             WR_IDLE: begin
-                if (vsync) begin
+                if (vsync && enable) begin
                     wr_byte_address <= 0;
                     wr_burst_count <= 0;
                     wr_state <= WR_PUSH;

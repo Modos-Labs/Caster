@@ -13,10 +13,6 @@
 `default_nettype none
 `timescale 1ns / 1ps
 
-`define INPUT_DVI       // DVI input on Glider DVI input
-//`define INPUT_LVDS      // LVDS input on Glider Type-C input
-//`define INPUT_INTERNAL	// Internal test feed
-
 module top(
     // Global clock input
     input wire CLK_IN,
@@ -60,15 +56,17 @@ module top(
     input wire DPI_DE,
     input wire DPI_VSYNC,
     input wire DPI_HSYNC,
-    input wire [23:0] DPI_PIXEL,
+    input wire [17:0] DPI_PIXEL,
     // CSR interface
     input wire SPI_CS,
     input wire SPI_SCK,
     input wire SPI_MOSI,
-    output wire SPI_MISO
+    output wire SPI_MISO,
+    // DEBUG
+    output wire LED
     );
     
-    parameter COLORMODE = "MONO";
+    parameter COLORMODE = "DES";
     
     parameter SIMULATION = "FALSE";
     parameter CALIB_SOFT_IP = "TRUE";
@@ -85,16 +83,19 @@ module top(
     
     wire clk_epdc;
 
-    reg c3_sys_rst = 1'b1;
-    always @(posedge clk_sys) begin
-        c3_sys_rst <= 1'b0;
-    end
-    
-    IBUFG clkin1_buf (
-        .O (clk_sys),
-        .I (CLK_IN)
+    wire dcm_locked;
+    sysclock sysclock(
+        // Clock in ports
+        .clk_in(CLK_IN),
+        // Clock out ports
+        .clk_ddr(clk_ddr),
+        .clk_sys(clk_sys),
+        // Status and control signals
+        .reset(1'b0),
+        .locked(dcm_locked)
     );
-    assign clk_ddr = clk_sys;
+
+    wire c3_sys_rst = !dcm_locked;
     assign mif_rst = c3_sys_rst;
 
     // Global frame trigger & control
@@ -107,7 +108,10 @@ module top(
     wire [31:0] vin_pixel;
     wire vin_valid;
     wire vin_ready;
-    vin vin(
+    wire [7:0] debug;
+    vin #(
+        .COLORMODE(COLORMODE)
+    ) vin(
         .rst(sys_rst),
         // DPI signals
         .dpi_vsync(DPI_VSYNC),
@@ -127,7 +131,8 @@ module top(
         .v_pclk(clk_epdc),
         .v_pixel(vin_pixel),
         .v_valid(vin_valid),
-        .v_ready(vin_ready)
+        .v_ready(vin_ready),
+        .debug(debug)
     );
 
     // Hardware DDR controller
@@ -352,6 +357,9 @@ module top(
     wire [1:0] dbg_scan_state;
     wire [10:0] dbg_scan_h_cnt;
     wire [10:0] dbg_scan_v_cnt;
+    wire dbg_spi_req_wen;
+    wire [7:0] dbg_spi_req_addr;
+    wire [7:0] dbg_spi_req_wdata;
 
     reg epdc_rst_sync = 1'b1;
     reg epdc_rst = 1'b1;
@@ -360,6 +368,8 @@ module top(
         epdc_rst_sync <= sys_rst;
     end
 
+
+    wire [15:0] epd_sd_caster;
     caster #(
         .SIMULATION(SIMULATION),
         .COLORMODE(COLORMODE)
@@ -386,7 +396,7 @@ module top(
         .epd_sdclk(EPD_SDCLK),
         .epd_sdle(EPD_SDLE),
         .epd_sdoe(EPD_SDOE),
-        .epd_sd(EPD_SD),
+        .epd_sd(epd_sd_caster),
         .epd_sdce0(EPD_SDCE0),
         // CSR interface
         .spi_cs(spi_cs),
@@ -403,58 +413,70 @@ module top(
         // Debugging
         .dbg_scan_state(dbg_scan_state),
         .dbg_scan_h_cnt(dbg_scan_h_cnt),
-        .dbg_scan_v_cnt(dbg_scan_v_cnt)
+        .dbg_scan_v_cnt(dbg_scan_v_cnt),
+        .dbg_spi_req_wen(dbg_spi_req_wen),
+        .dbg_spi_req_addr(dbg_spi_req_addr),
+        .dbg_spi_req_wdata(dbg_spi_req_wdata)
     );
     
+//    assign EPD_SD[7:0] = epd_sd_caster[7:0];
+//    assign EPD_SD[15:8] = debug;
+    assign EPD_SD = epd_sd_caster;
     // Debug
-//    wire [35:0] chipscope_control0;
-//    chipscope_icon icon (
-//        .CONTROL0(chipscope_control0) // INOUT BUS [35:0]
-//    );
-//    
-//    wire [31:0] ila_signals;
-//    chipscope_ila ila (
-//        .CONTROL(chipscope_control0), // INOUT BUS [35:0]
-//        .CLK(clk_mif),
-//        .TRIG0(ila_signals)
-//    );
-//
-//    assign ila_signals[0] = pll_locked;
-//    assign ila_signals[1] = ddr_calib_done;
-//    assign ila_signals[2] = sys_rst;
-//    assign ila_signals[3] = memif_error;
-//    assign ila_signals[4] = v_vs;
-//    assign ila_signals[5] = v_hs;
-//    assign ila_signals[6] = v_de;
-////    assign ila_signals[7] = v_pclk;
-////    assign ila_signals[8] = dbg_hsync;
-////    assign ila_signals[9] = dbg_vsync;
-////    assign ila_signals[10] = dbg_de;
-////    assign ila_signals[11] = dbg_pll_lck;
-//    
-//    assign ila_signals[7] = vin_ready; // vi_fifo_rd_en
-//    assign ila_signals[8] = vin_valid; // vi_fifo_rd not empty
-//    assign ila_signals[9] = memif_enable;
-//    assign ila_signals[10] = memif_trigger;
-//    assign ila_signals[11] = pix_read_valid; // bi_fifo_wr_en
-//    assign ila_signals[12] = bi_fifo_full;
-//    assign ila_signals[13] = bi_ready;
-//    assign ila_signals[14] = bi_valid; // bi_fifo_rd not empty
-//    assign ila_signals[15] = bo_valid;
-//    assign ila_signals[16] = bo_fifo_full;
-//    assign ila_signals[17] = pix_write_ready; // bo_fifo_rd_en
-//    assign ila_signals[18] = bo_fifo_empty;
-//    //assign ila_signals[19] = dbg_scan_state[0];
-//    assign ila_signals[19] = dbg_scan_state[1];
-//    //assign ila_signals[15] = vin_vsync;
-//    assign ila_signals[20] = vin_pixel[15]; // sneak peak of pixel
-//
-//    assign ila_signals[21] = spi_cs;
-//    assign ila_signals[22] = spi_sck;
-//    assign ila_signals[23] = spi_mosi;
-//    
-//    assign ila_signals[31:24] = dbg_scan_v_cnt[7:0];
-//    //assign ila_signals[31:21] = dbg_scan_v_cnt;
+    wire [35:0] chipscope_control0;
+    chipscope_icon icon (
+        .CONTROL0(chipscope_control0) // INOUT BUS [35:0]
+    );
+    
+    wire [31:0] ila_signals;
+    chipscope_ila ila (
+        .CONTROL(chipscope_control0), // INOUT BUS [35:0]
+        .CLK(clk_epdc),
+        .TRIG0(ila_signals)
+    );
+
+    assign ila_signals[0] = dcm_locked;
+    assign ila_signals[1] = ddr_calib_done;
+    assign ila_signals[2] = sys_rst;
+    assign ila_signals[3] = memif_error;
+    // assign ila_signals[4] = v_vs;
+    // assign ila_signals[5] = v_hs;
+    // assign ila_signals[6] = v_de;
+//    assign ila_signals[7] = v_pclk;
+//    assign ila_signals[8] = dbg_hsync;
+//    assign ila_signals[9] = dbg_vsync;
+//    assign ila_signals[10] = dbg_de;
+//    assign ila_signals[11] = dbg_pll_lck;
+
+   assign ila_signals[7] = vin_ready; // vi_fifo_rd_en
+   assign ila_signals[8] = vin_valid; // vi_fifo_rd not empty
+   assign ila_signals[9] = memif_enable;
+   assign ila_signals[10] = memif_trigger;
+   assign ila_signals[11] = pix_read_valid; // bi_fifo_wr_en
+   assign ila_signals[12] = bi_fifo_full;
+   assign ila_signals[13] = bi_ready;
+   assign ila_signals[14] = bi_valid; // bi_fifo_rd not empty
+   assign ila_signals[15] = bo_valid;
+   assign ila_signals[16] = bo_fifo_full;
+   assign ila_signals[17] = pix_write_ready; // bo_fifo_rd_en
+   assign ila_signals[18] = bo_fifo_empty;
+   //assign ila_signals[19] = dbg_scan_state[0];
+   assign ila_signals[19] = dbg_scan_state[1];
+   //assign ila_signals[15] = vin_vsync;
+   assign ila_signals[20] = vin_pixel[15]; // sneak peak of pixel
+
+    assign ila_signals[4] = spi_cs;
+    assign ila_signals[5] = spi_sck;
+    assign ila_signals[6] = spi_mosi;
+
+    // assign ila_signals[7] = dbg_spi_req_wen;
+    // assign ila_signals[15:8] = dbg_spi_req_addr;
+    // assign ila_signals[23:16] = dbg_spi_req_wdata;
+    
+    //assign ila_signals[31:24] = dbg_scan_v_cnt[7:0];
+    assign ila_signals[31:21] = dbg_scan_v_cnt;
+
+    assign LED = |(epd_sd_caster[7:0]);
 
 endmodule
 `default_nettype wire
