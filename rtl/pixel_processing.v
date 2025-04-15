@@ -51,7 +51,7 @@ module pixel_processing(
     //localparam FASTM_W2B_FRAMES = 6'd10;
 
     //
-    localparam FASTG_HOLDOFF_FRAMES = 6'd10;
+    localparam FASTG_HOLDOFF_FRAMES = 6'd1;
     localparam FASTG_B2G_FRAMES = 6'd2;
     localparam FASTG_W2G_FRAMES = 6'd2;
     localparam FASTG_SETTLE_FRAMES = 6'd5;
@@ -239,10 +239,11 @@ module pixel_processing(
     wire [7:0] proc_p_li; // linear
     /* verilator lint_on UNUSEDSIGNAL */
     // Let it optimize, only 4b in and 4b out used
-    degamma degamma (
+    /*degamma degamma (
         .in({proc_p_or, proc_p_or[1:0]}),
         .out(proc_p_li)
-    );
+    );*/
+    assign proc_p_li = {proc_p_or, 4'b0};
 
     wire [3:0] proc_vin = force_clear ? clear_color :
         (pixel_basemode == BASEMODE_FAST_GREY) ? (proc_p_li[7:4]) :
@@ -470,9 +471,17 @@ module pixel_processing(
                 if (proc_vin[3:2] != pixel_prev[1:0]) begin
                     // Pixel state changed
                     proc_output = drive_towards_input;
-                    proc_bo = proc_vin[3] ? (
-                        {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, csr_mindrv, proc_vin[3:2]}
-                    ) : {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, csr_mindrv, proc_vin[3:2]};
+                    proc_bo = ((proc_vin[3] != pixel_prev[1]) || (pixel_prev[1] != pixel_prev[0])) ? 
+                        (proc_vin[3] ? (
+                                {proc_bi[15:12], STAGE_MONO, FASTM_B2W_FRAMES, csr_mindrv, proc_vin[3:2]}
+                            ) : {proc_bi[15:12], STAGE_MONO, FASTM_W2B_FRAMES, csr_mindrv, proc_vin[3:2]}) :
+						((proc_vin[3:2] == 2'b10) ? (
+                                {proc_bi[15:12], STAGE_GREY, FASTG_W2G_FRAMES + FASTG_SETTLE_FRAMES, 2'b00, proc_vin[3:2]}
+                            ) : (proc_vin[3:2] == 2'b01) ? (
+                                {proc_bi[15:12], STAGE_GREY, FASTG_B2G_FRAMES + FASTG_SETTLE_FRAMES, 2'b00, proc_vin[3:2]}
+                            ) : (
+                                {proc_bi[15:12], STAGE_DONE, 6'd0, 2'b00, proc_vin[3:2]}
+                            ));
                 end
                 else begin
                     // Pixel state not changed
@@ -519,9 +528,9 @@ module pixel_processing(
             // x111xxx - 0-7 / 64-71 noop
             // 1xxxxxx - 8-63 black
             // 0xxxxxx - 72-127 white
-            if (op_framecnt[5:3] == 3'b111)
+            if (op_framecnt[4:2] == 3'b111)
                 proc_output = `NO_DRIVE;
-            else if (op_framecnt[6] == 1'b1)
+            else if (op_framecnt[5] == 1'b1)
                 proc_output = `DRIVE_BLACK;
             else
                 proc_output = `DRIVE_WHITE;
