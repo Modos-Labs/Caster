@@ -61,7 +61,10 @@ module caster(
     output wire [15:0]  dbg_wvfm_tgt,
     output wire [1:0]   dbg_scan_state,
     output wire [10:0]  dbg_scan_v_cnt,
-    output wire [10:0]  dbg_scan_h_cnt
+    output wire [10:0]  dbg_scan_h_cnt,
+    output wire         dbg_spi_req_wen,
+    output wire [7:0]   dbg_spi_req_addr,
+    output wire [7:0]   dbg_spi_req_wdata
     );
 
     /* verilator lint_off UNUSEDPARAM */
@@ -81,7 +84,7 @@ module caster(
     localparam SCAN_RUNNING = 2'd2;
 
     /* verilator lint_off WIDTH */
-    localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 255 : 2;
+    localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 127 : 2;
     /* verilator lint_on WIDTH */
 
     // Internal design specific
@@ -145,7 +148,10 @@ module caster(
         .mig_error(mig_error),
         .mif_error(mif_error),
         .op_busy(op_valid),
-        .op_queue(op_pending)
+        .op_queue(op_pending),
+        .dbg_spi_req_wen(dbg_spi_req_wen),
+        .dbg_spi_req_addr(dbg_spi_req_addr),
+        .dbg_spi_req_wdata(dbg_spi_req_wdata)
     );
 
     /* verilator lint_off width */
@@ -364,44 +370,58 @@ module caster(
     wire [3:0] s2_pixel_bn1b_dithered;
     wire [15:0] s2_pixel_bn4b_dithered;
 
-    // Position for bayer dithering
-    wire [2:0] x_pos;
+    // Position for ordered dithering
+    wire [2:0] by_x_pos;
+    wire [3:0] bn_x_pos;
+    wire [1:0] bn_x_pos_sel;
     wire [2:0] y_pos;
 
     generate
     if (COLORMODE == "DES") begin: gen_des_counter
-        reg [2:0] v_cnt_mod_6;
+        reg [1:0] v_cnt_mod_3;
         reg [1:0] h_cnt_mod_3;
-        wire [2:0] v_cnt_mod_6_inc = (v_cnt_mod_6 == 5) ?
-                (0) : (v_cnt_mod_6 + 1);
+        reg [3:0] h_cnt_div_3;
+        wire [2:0] v_cnt_mod_3_inc = (v_cnt_mod_3 == 2) ?
+                (0) : (v_cnt_mod_3 + 1);
         wire [1:0] h_cnt_mod_3_inc = (h_cnt_mod_3 == 2) ?
                 (0) : (h_cnt_mod_3 + 1);
+        wire [2:0] h_cnt_div_3_inc = (h_cnt_mod_3 == 2) ?
+                (h_cnt_div_3 + 1) : (h_cnt_div_3);
         always @(posedge clk)
             if (rst) begin
-                v_cnt_mod_6 <= 0;
+                v_cnt_mod_3 <= 0;
                 h_cnt_mod_3 <= 0;
             end
             else begin
                 if (scan_state == SCAN_RUNNING) begin
                     if (scan_h_cnt == htotal - 1) begin
+                        h_cnt_mod_3 <= 0;
+                        h_cnt_div_3 <= 0;
                         if (scan_v_cnt == vtotal - 1) begin
-                            v_cnt_mod_6 <= 0;
+                            v_cnt_mod_3 <= 0;
                         end
                         else begin
-                            h_cnt_mod_3 <= 0;
-                            v_cnt_mod_6 <= v_cnt_mod_6_inc;
+                            v_cnt_mod_3 <= v_cnt_mod_3_inc;
                         end
                     end
                     else begin
                         h_cnt_mod_3 <= h_cnt_mod_3_inc;
+                        h_cnt_div_3 <= h_cnt_div_3_inc;
                     end
                 end
             end
-        assign x_pos = {1'b0, h_cnt_mod_3};
-        assign y_pos = v_cnt_mod_6;
+        wire [2:0] h_cnt_bn_add = h_cnt_mod_3 + v_cnt_mod_3;
+        assign by_x_pos = {1'b0, h_cnt_mod_3};
+        assign bn_x_pos = h_cnt_div_3;
+        assign bn_x_pos_sel =
+            (h_cnt_bn_add == 3'd4) ? 2'd1 :
+            (h_cnt_bn_add == 3'd3) ? 2'd0 : h_cnt_bn_add[1:0];
+        assign y_pos = v_cnt_mod_3;
     end
-    else if (COLORMODE == "MONO") begin: gen_mono_counter
-        assign x_pos = scan_h_cnt[2:0];
+    else if ((COLORMODE == "MONO") || (COLORMODE == "RGBW")) begin: gen_mono_counter
+        assign by_x_pos = scan_h_cnt[2:0];
+        assign bn_x_pos = scan_h_cnt[3:0];
+        assign bn_x_pos_sel = 2'b0;
         assign y_pos = scan_v_cnt[2:0];
     end
     endgenerate
@@ -419,22 +439,26 @@ module caster(
 
     // Output dithered pixel 1 clock later
     blue_noise_dithering #(
-        .OUTPUT_BITS(1)
+        .OUTPUT_BITS(1),
+        .COLORMODE(COLORMODE)
     ) blue_noise_dithering_1b (
         .clk(clk),
         .vin(s2_pixel_linear),
         .vout(s2_pixel_bn1b_dithered),
-        .x_pos(scan_h_cnt[3:0]),
+        .x_pos(bn_x_pos),
+        .x_pos_sel(bn_x_pos_sel),
         .y_pos(scan_v_cnt[5:0])
     );
 
     blue_noise_dithering #(
-        .OUTPUT_BITS(4)
+        .OUTPUT_BITS(4),
+        .COLORMODE(COLORMODE)
     ) blue_noise_dithering_4b (
         .clk(clk),
         .vin(s2_pixel_linear),
         .vout(s2_pixel_bn4b_dithered),
-        .x_pos(scan_h_cnt[3:0]),
+        .x_pos(bn_x_pos),
+        .x_pos_sel(bn_x_pos_sel),
         .y_pos(scan_v_cnt[5:0])
     );
 
@@ -444,7 +468,7 @@ module caster(
         .clk(clk),
         .vin(s2_pixel_linear),
         .vout(s2_pixel_bayer_dithered),
-        .x_pos(x_pos),
+        .x_pos(by_x_pos),
         .y_pos(y_pos)
     );
 
@@ -682,7 +706,8 @@ module caster(
 `endif
 
     // mode
-    assign epd_gdoe = (scan_in_vsync || scan_in_vbp || scan_in_vact) ? 1'b1 : 1'b0;
+    //assign epd_gdoe = (scan_in_vsync || scan_in_vbp || scan_in_vact) ? 1'b1 : 1'b0;
+    assign epd_gdoe = 1'b1;
     // ckv
     wire epd_gdclk_pre = (scan_in_hsync || scan_in_hbp || scan_in_hact) ? 1'b1 : 1'b0;
     reg epd_gdclk_delay;
@@ -692,8 +717,8 @@ module caster(
 
     // spv
     assign epd_gdsp = (scan_in_vsync) ? 1'b0 : 1'b1;
-    assign epd_sdoe = epd_gdoe;
-
+    //assign epd_sdoe = epd_gdoe;
+    assign epd_sdoe = 1'b1;
     
     // stl
     

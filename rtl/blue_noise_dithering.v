@@ -13,12 +13,14 @@
 `timescale 1ns / 1ps
 `default_nettype none
 module blue_noise_dithering #(
-    parameter OUTPUT_BITS = 1 // 1 or 4
+    parameter OUTPUT_BITS = 1, // 1 or 4
+    parameter COLORMODE = "MONO"
 ) (
     input wire                      clk,
     input wire [31:0]               vin,
     output reg [OUTPUT_BITS*4-1:0]  vout,
     input wire [3:0]                x_pos,
+    input wire [1:0]                x_pos_sel, // Use only in DES
     input wire [5:0]                y_pos
 );
 
@@ -34,6 +36,44 @@ module blue_noise_dithering #(
     /* verilator lint_on UNUSEDSIGNAL */
 
     wire [9:0] addr_hi = {y_pos, x_pos};
+    
+    reg [1:0] addr_lo_0;
+    reg [1:0] addr_lo_1;
+    reg [1:0] addr_lo_2;
+    reg [1:0] addr_lo_3;
+    
+    generate
+    if (COLORMODE == "DES") begin: gen_des_addr_lo
+        always @(*) begin
+            if (x_pos_sel == 2'd0) begin
+                addr_lo_0 = 2'd0;
+                addr_lo_1 = 2'd0;
+                addr_lo_2 = 2'd0;
+                addr_lo_3 = 2'd1;
+            end
+            else if (x_pos_sel == 2'd1) begin
+                addr_lo_0 = 2'd1;
+                addr_lo_1 = 2'd1;
+                addr_lo_2 = 2'd2;
+                addr_lo_3 = 2'd2;
+            end
+            else begin
+                addr_lo_0 = 2'd2;
+                addr_lo_1 = 2'd3;
+                addr_lo_2 = 2'd3;
+                addr_lo_3 = 2'd3;
+            end
+        end
+    end
+    else begin: gen_mono_addr_lo
+        always @(*) begin
+            addr_lo_0 = 2'd0;
+            addr_lo_1 = 2'd0;
+            addr_lo_2 = 2'd1;
+            addr_lo_3 = 2'd1;
+        end
+    end
+    endgenerate
 
     bramdp #(
         .ABITS(12),
