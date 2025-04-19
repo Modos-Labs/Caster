@@ -101,7 +101,7 @@ module top(
     // Global frame trigger & control
     wire b_trigger;
     wire global_en;
-    wire [23:0] frame_bytes;
+    wire [23:0] frame_bytes_memif;
 
     // Video input
     wire vin_vsync;
@@ -214,6 +214,14 @@ module top(
         .error(mig_error)
     );
 
+    wire mig_error_epdc;
+    mu_dsync mig_error_sync (
+        .iclk(clk_mif),
+        .in(mig_error),
+        .oclk(clk_epdc),
+        .out(mig_error_epdc)
+    );
+
     // VRAM interface
     wire memif_enable;
     wire memif_trigger;
@@ -233,7 +241,7 @@ module top(
         // Control
         .enable(memif_enable),
         .vsync(memif_trigger),
-        .frame_bytes(frame_bytes),
+        .frame_bytes(frame_bytes_memif),
         // Pixel output interface
         .pix_read(pix_read),
         .pix_read_valid(pix_read_valid),
@@ -266,16 +274,42 @@ module top(
         .error(memif_error)
     );
 
-    dff_sync memif_vs_sync (
-        .i(b_trigger),
-        .clko(clk_mif),
-        .o(memif_trigger)
+    mu_dsync memif_vs_sync (
+        .iclk(clk_epdc),
+        .in(b_trigger),
+        .oclk(clk_mif),
+        .out(memif_trigger)
     );
 
-    dff_sync memif_en_sync (
-        .i(ddr_calib_done && global_en),
-        .clko(clk_mif),
-        .o(memif_enable)
+    wire [23:0] frame_bytes;
+    mu_dbsync #(.W(24)) memif_fbytes_sync (
+        .iclk(clk_epdc),
+        .in(frame_bytes),
+        .oclk(clk_mif),
+        .out(frame_bytes_memif)
+    );
+
+    wire memif_error_epdc;
+    mu_dsync memif_error_sync (
+        .iclk(clk_mif),
+        .in(memif_error),
+        .oclk(clk_epdc),
+        .out(memif_error_epdc)
+    );
+
+    wire ddr_calib_done_epdc;
+    mu_dsync ddr_calib_done_sync (
+        .iclk(clk_mif),
+        .in(ddr_calib_done),
+        .oclk(clk_epdc),
+        .out(ddr_calib_done_epdc)
+    );
+
+    mu_dsync memif_en_sync (
+        .iclk(clk_epdc),
+        .in(ddr_calib_done_epdc && global_en),
+        .oclk(clk_mif),
+        .out(memif_enable)
     );
 
     // VRAM FIFOs
@@ -323,35 +357,32 @@ module top(
     assign pix_write_valid = !bo_fifo_empty;
     
     // EPD controller
-    wire epdc_ddr_calib_done;
-    dff_sync epdc_ddr_calib_done_sync (
-        .i(ddr_calib_done),
-        .clko(clk_epdc),
-        .o(epdc_ddr_calib_done)
-    );
-    wire sys_ready = epdc_ddr_calib_done;
+    wire sys_ready = ddr_calib_done_epdc;
 
     wire spi_ncs;
     wire spi_sck;
     wire spi_mosi;
     wire spi_miso;
-    dff_sync spi_cs_sync (
-        .i(!SPI_CS),
-        .clko(clk_epdc),
-        .o(spi_ncs)
+    mu_dsync spi_cs_sync (
+        .iclk(1'b0), // external
+        .in(!SPI_CS),
+        .oclk(clk_epdc),
+        .out(spi_ncs)
     );
     wire spi_cs = !spi_ncs;
 
-    dff_sync spi_sck_sync (
-        .i(SPI_SCK),
-        .clko(clk_epdc),
-        .o(spi_sck)
+    mu_dsync spi_sck_sync (
+        .iclk(1'b0), // external
+        .in(SPI_SCK),
+        .oclk(clk_epdc),
+        .out(spi_sck)
     );
 
-    dff_sync spi_mosi_sync (
-        .i(SPI_MOSI),
-        .clko(clk_epdc),
-        .o(spi_mosi)
+    mu_dsync spi_mosi_sync (
+        .iclk(1'b0), // external
+        .in(SPI_MOSI),
+        .oclk(clk_epdc),
+        .out(spi_mosi)
     );
     
     wire [1:0] dbg_scan_state;
@@ -406,8 +437,8 @@ module top(
         // Control / status
         .b_trigger(b_trigger),
         .sys_ready(sys_ready),
-        .mig_error(mig_error),
-        .mif_error(memif_error),
+        .mig_error(mig_error_epdc),
+        .mif_error(memif_error_epdc),
         .frame_bytes(frame_bytes),
         .global_en(global_en),
         // Debugging

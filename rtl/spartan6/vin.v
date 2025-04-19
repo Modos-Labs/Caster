@@ -182,7 +182,8 @@ module vin(
     assign v_valid = !fifo_empty;
 
     // Sync vs signal to clk_sys clock domain
-    dff_sync vs_sync (
+    mu_dsync vs_sync (
+        .iclk(vi_pclk),
         .i(vi_vsync),
         .clko(v_pclk),
         .o(v_vsync)
