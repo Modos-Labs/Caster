@@ -52,7 +52,19 @@
 #define CSR_CFG_FBYTES_B2   27
 #define CSR_CFG_FBYTES_B1   28
 #define CSR_CFG_FBYTES_B0   29
-#define CSR_CFG_MINDRV        30
+#define CSR_CFG_MINDRV      30
+#define CSR_OSD_EN          31
+#define CSR_OSD_LEFT_HI     32
+#define CSR_OSD_LEFT_LO     33
+#define CSR_OSD_RIGHT_HI    34
+#define CSR_OSD_RIGHT_LO    35
+#define CSR_OSD_TOP_HI      36
+#define CSR_OSD_TOP_LO      37
+#define CSR_OSD_BOTTOM_HI   38
+#define CSR_OSD_BOTTOM_LO   39
+#define CSR_OSD_ADDR_HI     40
+#define CSR_OSD_ADDR_LO     41
+#define CSR_OSD_WR          42
 #define CSR_STATUS          128
 // Alias for 16bit registers
 #define CSR_LUT_ADDR        CSR_LUT_ADDR_HI
@@ -62,6 +74,11 @@
 #define CSR_OP_BOTTOM       CSR_OP_BOTTOM_HI
 #define CSR_CFG_V_ACT       CSR_CFG_V_ACT_HI
 #define CSR_CFG_H_ACT       CSR_CFG_H_ACT_HI
+#define CSR_OSD_LEFT        CSR_OSD_LEFT_HI
+#define CSR_OSD_RIGHT       CSR_OSD_RIGHT_HI
+#define CSR_OSD_TOP         CSR_OSD_TOP_HI
+#define CSR_OSD_BOTTOM      CSR_OSD_BOTTOM_HI
+#define CSR_OSD_ADDR        CSR_OSD_ADDR_HI
 
 // Commands
 #define OP_EXT_REDRAW       0

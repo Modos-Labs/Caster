@@ -40,6 +40,10 @@ static int last_hs;
 void render_copy(); // Function in main.cpp
 
 void dispsim_set_pixel(uint32_t *pixels, int x, int y, uint8_t input) {
+    if (x >= DISP_WIDTH)
+        return;
+    if (y >= DISP_HEIGHT)
+        return;
 #ifdef USE_DBG_OUTPUT
     int32_t pixel = input | (input << 4);
 #else

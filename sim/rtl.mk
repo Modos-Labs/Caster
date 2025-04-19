@@ -18,7 +18,11 @@ VERILATOR := $(VERILATOR_ROOT)/bin/verilator
 endif
 VFLAGS := -Wall -Wno-fatal -MMD --trace -cc \
 		-I../rtl \
-		-Wno-PINCONNECTEMPTY
+		-I../rtl/mulib/rtl \
+		-I../rtl/mulib/rtl/baseip \
+		-I../rtl/mulib/rtl/baseip/generic \
+		-Wno-PINCONNECTEMPTY \
+		+define+SIMULATION=1
 ifeq ($(VERBOSE), 1)
 VFLAGS += +define+VERBOSE=1
 endif

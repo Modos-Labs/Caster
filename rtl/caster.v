@@ -75,9 +75,6 @@ module caster(
     // Screen timing
     parameter SIMULATION = "TRUE";
 
-    // Features
-    parameter ENABLE_ERROR_DIFFUSION = "FALSE";
-
     // Output logic
     localparam SCAN_IDLE = 2'd0;
     localparam SCAN_WAITING = 2'd1;
@@ -92,19 +89,27 @@ module caster(
     localparam PIPELINE_DELAY = 4;
 
     // Control status registers
-    wire [5:0] csr_lutframe;
-    wire [11:0] csr_lutaddr;
-    wire [7:0] csr_lutwr;
-    wire csr_lutwe;
+    wire [5:0] csr_lut_frame;
+    wire [11:0] csr_lut_addr;
+    wire [7:0] csr_lut_wr;
+    wire csr_lut_we;
+    wire csr_osd_en;
+    wire [11:0] csr_osd_left;
+    wire [11:0] csr_osd_right;
+    wire [11:0] csr_osd_top;
+    wire [11:0] csr_osd_bottom;
+    wire [11:0] csr_osd_addr;
+    wire [7:0] csr_osd_wr;
+    wire csr_osd_we;
     wire [1:0] csr_mindrv;
-    wire [11:0] csr_opleft;
-    wire [11:0] csr_opright;
-    wire [11:0] csr_optop;
-    wire [11:0] csr_opbottom;
-    wire [7:0] csr_opparam;
-    wire [7:0] csr_oplength;
-    wire [7:0] csr_opcmd;
-    wire csr_ope;
+    wire [11:0] csr_op_left;
+    wire [11:0] csr_op_right;
+    wire [11:0] csr_op_top;
+    wire [11:0] csr_op_bottom;
+    wire [7:0] csr_op_param;
+    wire [7:0] csr_op_length;
+    wire [7:0] csr_op_cmd;
+    wire csr_op_en;
     wire [7:0] vfp;
     wire [7:0] vsync;
     wire [7:0] vbp;
@@ -120,18 +125,26 @@ module caster(
         .spi_sck(spi_sck),
         .spi_mosi(spi_mosi),
         .spi_miso(spi_miso),
-        .csr_lutframe(csr_lutframe),
-        .csr_lutaddr(csr_lutaddr),
-        .csr_lutwr(csr_lutwr),
-        .csr_lutwe(csr_lutwe),
-        .csr_opleft(csr_opleft),
-        .csr_opright(csr_opright),
-        .csr_optop(csr_optop),
-        .csr_opbottom(csr_opbottom),
-        .csr_opparam(csr_opparam),
-        .csr_oplength(csr_oplength),
-        .csr_opcmd(csr_opcmd),
-        .csr_ope(csr_ope),
+        .csr_lut_frame(csr_lut_frame),
+        .csr_lut_addr(csr_lut_addr),
+        .csr_lut_wr(csr_lut_wr),
+        .csr_lut_we(csr_lut_we),
+        .csr_osd_en(csr_osd_en),
+        .csr_osd_left(csr_osd_left),
+        .csr_osd_right(csr_osd_right),
+        .csr_osd_top(csr_osd_top),
+        .csr_osd_bottom(csr_osd_bottom),
+        .csr_osd_addr(csr_osd_addr),
+        .csr_osd_wr(csr_osd_wr),
+        .csr_osd_we(csr_osd_we),
+        .csr_op_left(csr_op_left),
+        .csr_op_right(csr_op_right),
+        .csr_op_top(csr_op_top),
+        .csr_op_bottom(csr_op_bottom),
+        .csr_op_param(csr_op_param),
+        .csr_op_length(csr_op_length),
+        .csr_op_cmd(csr_op_cmd),
+        .csr_op_en(csr_op_en),
         .csr_en(global_en),
         .csr_cfg_vfp(vfp),
         .csr_cfg_vsync(vsync),
@@ -159,12 +172,34 @@ module caster(
     wire [10:0] htotal = hfp + hsync + hbp + hact;
     /* verilator lint_on width */
 
+    // OSD overlay RAM
+    wire [11:0] osd_rd_addr;
+    wire [7:0] osd_rd;
+
+    // Single 4KB block RAM, use port A for read and port B for write
+    // Resolution is fixed 256x128 @ 1bpp
+    mu_ram_2rw #(
+        .AW(12),
+        .DW(8)
+    ) bramdp0 (
+        .clka(clk),
+        .wea(1'b0),
+        .addra(osd_rd_addr),
+        .dina(8'd0),
+        .douta(osd_rd),
+        .clkb(clk),
+        .web(csr_osd_we),
+        .addrb(csr_osd_addr),
+        .dinb(csr_osd_wr),
+        .doutb()
+    );
+
     // frame operation are latched at vsync
     reg trigger_last;
     always @(posedge clk) begin
         trigger_last <= b_trigger;
     end
-    wire op_trigger = !trigger_last & b_trigger;
+    wire vsync_trigger = !trigger_last & b_trigger;
     wire op_done;
 
     // When SPI write to CMDEN, a copy is first created in the pending register
@@ -187,7 +222,7 @@ module caster(
     reg [7:0] op_length;
     reg [7:0] op_cmd;
     always @(posedge clk) begin
-        if (op_trigger && op_done) begin
+        if (vsync_trigger && op_done) begin
             op_valid <= op_pending;
             op_left <= op_pending_left;
             op_right <= op_pending_right;
@@ -198,19 +233,38 @@ module caster(
             op_cmd <= op_pending_cmd;
             op_pending <= 1'b0;
         end
-        if (csr_ope) begin
+        if (csr_op_en) begin
             op_pending <= 1'b1;
-            op_pending_left <= csr_opleft;
-            op_pending_right <= csr_opright;
-            op_pending_top <= csr_optop;
-            op_pending_bottom <= csr_opbottom;
-            op_pending_param <= csr_opparam;
-            op_pending_length <= csr_oplength;
-            op_pending_cmd <= csr_opcmd;
+            op_pending_left <= csr_op_left;
+            op_pending_right <= csr_op_right;
+            op_pending_top <= csr_op_top;
+            op_pending_bottom <= csr_op_bottom;
+            op_pending_param <= csr_op_param;
+            op_pending_length <= csr_op_length;
+            op_pending_cmd <= csr_op_cmd;
         end
         if (rst) begin
             op_valid <= 1'b0;
             op_pending <= 1'b0;
+        end
+    end
+
+    // Similarly OSD settings are buffered at Vsync to avoid tearing
+    reg osd_en;
+    reg [11:0] osd_left;
+    reg [11:0] osd_right;
+    reg [11:0] osd_top;
+    reg [11:0] osd_bottom;
+    always @(posedge clk) begin
+        if (vsync_trigger) begin // Use the same trigger
+            osd_en <= csr_osd_en;
+            osd_left <= csr_osd_left;
+            osd_right <= csr_osd_right;
+            osd_top <= csr_osd_top;
+            osd_bottom <= csr_osd_bottom;
+        end
+        if (rst) begin
+            osd_en <= 1'b0;
         end
     end
 
@@ -255,7 +309,7 @@ module caster(
                 end
                 // Update Auto LUT state
                 if (al_framecnt == 0) begin
-                    al_framecnt <= csr_lutframe;
+                    al_framecnt <= csr_lut_frame;
                 end
                 else begin
                     al_framecnt <= al_framecnt - 1;
@@ -325,7 +379,7 @@ module caster(
     wire scan_in_act = scan_in_vact && scan_in_hact;
 
     // Processing pipeline: 5 stages
-    // Stage 1: VIN fifo readout, BI fifo readout
+    // Stage 1: VIN fifo readout, BI fifo readout, OSD readout
     // Stage 2: VIN, BI->dithering unit
     // Stage 3: dithered/ vin, BI->Waveform lookup
     // Stage 4: Dithered, wvfm result->pixel processing
@@ -336,7 +390,6 @@ module caster(
     wire s1_hactive = (scan_state != SCAN_IDLE) ? (
         (scan_h_cnt >= (hfp + hsync + hbp - PIPELINE_DELAY)) &&
         (scan_h_cnt < (htotal - PIPELINE_DELAY))) : 1'b0;
-    wire s1_hsync = (scan_state != SCAN_IDLE) ? (scan_h_cnt == 'd0) : 1'b0;
     /* verilator lint_on width */
     wire s1_active = scan_in_vact && s1_hactive;
     // Essentially a scan_in_act but few cycles eariler.
@@ -360,15 +413,46 @@ module caster(
         end
     endgenerate
 
+    // OSD: 12 bit address, 256x128 size, each byte has 8 pixels -> 32x128
+    /* verilator lint_off width */
+    wire [6:0] osd_ram_y_offset = v_cnt_offset - osd_top;
+    wire [4:0] osd_ram_x_offset = h_cnt_offset[10:1] - osd_left;
+    /* verilator lint_on width */
+    assign osd_rd_addr = {osd_ram_y_offset, osd_ram_x_offset};
+    wire s1_osd_valid =
+        osd_en &&
+        ({1'b0, h_cnt_offset} >= osd_left) && ({1'b0, h_cnt_offset} < osd_right) &&
+        ({1'b0, v_cnt_offset} >= osd_top) && ({1'b0, v_cnt_offset} < osd_bottom);
+
+    // Move to next stage
+    reg [3:0] s2_op_valid;
+    reg s2_osd_valid;
+    always @(posedge clk) begin
+        s2_op_valid <= s1_op_valid;
+        s2_osd_valid <= s1_osd_valid;
+    end
+
+
     // STAGE 2
     reg s2_active;
     always @(posedge clk)
         s2_active <= s1_active;
 
+    // OSD overlay
+    wire [3:0] s2_osd_overlay = h_cnt_offset[0] ? osd_rd[7:4] : osd_rd[3:0];
+    wire [31:0] s2_osd_overlay_y8 = {{8{s2_osd_overlay[3]}},
+        {8{s2_osd_overlay[2]}}, {8{s2_osd_overlay[1]}}, {8{s2_osd_overlay[0]}}};
+    wire [31:0] s2_vin_overlayed = s2_osd_valid ? s2_osd_overlay_y8 : vin_pixel;
+
+    // Slice Y8 version downto Y4
+    wire [15:0] s2_vin_overlayed_y4 = {s2_vin_overlayed[31:28],
+        s2_vin_overlayed[23:20], s2_vin_overlayed[15:12], s2_vin_overlayed[7:4]};
+
     // Image dithering
-    wire [3:0] s2_pixel_bayer_dithered;
-    wire [3:0] s2_pixel_bn1b_dithered;
-    wire [15:0] s2_pixel_bn4b_dithered;
+    // All these processing has 1 cycle delay
+    wire [3:0] s3_pixel_bayer_dithered;
+    wire [3:0] s3_pixel_bn1b_dithered;
+    wire [15:0] s3_pixel_bn4b_dithered;
 
     // Position for ordered dithering
     wire [2:0] by_x_pos;
@@ -431,7 +515,7 @@ module caster(
     generate
         for (i = 0; i < 4; i = i + 1) begin: gen_degamma
             degamma degamma (
-                .in(vin_pixel[i*8+2 +: 6]),
+                .in(s2_vin_overlayed[i*8+2 +: 6]),
                 .out(s2_pixel_linear[i*8 +: 8])
             );
         end
@@ -444,7 +528,7 @@ module caster(
     ) blue_noise_dithering_1b (
         .clk(clk),
         .vin(s2_pixel_linear),
-        .vout(s2_pixel_bn1b_dithered),
+        .vout(s3_pixel_bn1b_dithered),
         .x_pos(bn_x_pos),
         .x_pos_sel(bn_x_pos_sel),
         .y_pos(scan_v_cnt[5:0])
@@ -456,7 +540,7 @@ module caster(
     ) blue_noise_dithering_4b (
         .clk(clk),
         .vin(s2_pixel_linear),
-        .vout(s2_pixel_bn4b_dithered),
+        .vout(s3_pixel_bn4b_dithered),
         .x_pos(bn_x_pos),
         .x_pos_sel(bn_x_pos_sel),
         .y_pos(scan_v_cnt[5:0])
@@ -467,45 +551,19 @@ module caster(
     ) bayer_dithering (
         .clk(clk),
         .vin(s2_pixel_linear),
-        .vout(s2_pixel_bayer_dithered),
+        .vout(s3_pixel_bayer_dithered),
         .x_pos(by_x_pos),
         .y_pos(y_pos)
     );
 
-    wire [15:0] s2_pixel_ed4b_dithered;
-    generate if (ENABLE_ERROR_DIFFUSION == "TRUE") begin: gen_err_diff
-        error_diffusion_dithering #(
-            .INPUT_BITS(8),
-            .OUTPUT_BITS(4),
-            .PIXEL_RATE(4)
-        ) ed4b_dithering (
-            .clk(clk),
-            .rst(rst),
-            .in(s2_pixel_linear),
-            .in_valid(s2_active),
-            .hsync(s1_hsync),
-            .vsync(scan_in_vsync),
-            .out(s2_pixel_ed4b_dithered)
-        );
-    end
-    else begin: gen_err_diff_approx
-        // Error diffusion algorithm disabled through parameter
-        // Use blue noise as approximation
-        assign s2_pixel_ed4b_dithered = s2_pixel_bn4b_dithered;
-    end endgenerate
-
-    // Slice Y8 input downto Y4
-    wire [15:0] s1_vin_pixel_y4 = {vin_pixel[31:28], vin_pixel[23:20],
-            vin_pixel[15:12], vin_pixel[7:4]};
-
-    // vin and bi pixel are duplicated for use in next stage
-    reg [63:0] s2_bi_pixel;
-    reg [15:0] s2_vin_pixel;
-    reg [3:0] s2_op_valid;
+    // Move to next stage
+    reg [63:0] s3_bi_pixel;
+    reg [15:0] s3_vin_pixel;
+    reg [3:0] s3_op_valid;
     always @(posedge clk) begin
-        s2_vin_pixel <= s1_vin_pixel_y4;
-        s2_bi_pixel <= bi_pixel;
-        s2_op_valid <= s1_op_valid;
+        s3_vin_pixel <= s2_vin_overlayed_y4;
+        s3_bi_pixel <= bi_pixel;
+        s3_op_valid <= s2_op_valid;
     end
 
     // STAGE 3
@@ -522,7 +580,7 @@ module caster(
     // 2 bit data output
     // 32 Kb
     wire [13:0] ram_addr_rd [0:3];
-    wire [7:0] s3_lut_rd;
+    wire [7:0] s4_lut_rd; // 1 cycle latency
     generate
         for (i = 0; i < 4; i = i + 1) begin: gen_wvfm_lookup
             // See pixel_processing.v comments for more details
@@ -530,14 +588,14 @@ module caster(
             // Local counter (per pixel counter) is used for manual LUT modes
             // Global counter is used for auto LUT modes
             /*verilator lint_off UNUSEDSIGNAL */
-            wire [15:0] wvfm_bi = s2_bi_pixel[i*16 +: 16];
+            wire [15:0] wvfm_bi = s3_bi_pixel[i*16 +: 16];
             /*verilator lint_on UNUSEDSIGNAL */
             wire use_local_counter =  wvfm_bi[15];
             wire [5:0] wvfm_fcnt_global_counter = wvfm_bi[9:4];
             wire [5:0] wvfm_fcnt_local_counter = al_framecnt;
             wire [5:0] wvfm_fcnt = use_local_counter ?
                     wvfm_fcnt_local_counter : wvfm_fcnt_global_counter;
-            wire [5:0] wvfm_fseq = csr_lutframe - wvfm_fcnt;
+            wire [5:0] wvfm_fseq = csr_lut_frame - wvfm_fcnt;
             wire [3:0] wvfm_src_global_counter = wvfm_bi[13:10];
             wire [3:0] wvfm_src_local_counter = wvfm_bi[7:4];
             wire [3:0] wvfm_src = use_local_counter ?
@@ -548,9 +606,9 @@ module caster(
         end
     endgenerate
 
-    wire ram_we = csr_lutwe;
-    wire [7:0] ram_wr = csr_lutwr;
-    wire [11:0] ram_addr_wr = csr_lutaddr;
+    wire ram_we = csr_lut_we;
+    wire [7:0] ram_wr = csr_lut_wr;
+    wire [11:0] ram_addr_wr = csr_lut_addr;
 
     wvfmlut wvfmlut1 (
         .clk(clk),
@@ -558,9 +616,9 @@ module caster(
         .addr(ram_addr_wr),
         .din(ram_wr),
         .addra(ram_addr_rd[0]),
-        .douta(s3_lut_rd[1:0]),
+        .douta(s4_lut_rd[1:0]),
         .addrb(ram_addr_rd[1]),
-        .doutb(s3_lut_rd[3:2])
+        .doutb(s4_lut_rd[3:2])
     );
 
     wvfmlut wvfmlut2 (
@@ -569,59 +627,55 @@ module caster(
         .addr(ram_addr_wr),
         .din(ram_wr),
         .addra(ram_addr_rd[2]),
-        .douta(s3_lut_rd[5:4]),
+        .douta(s4_lut_rd[5:4]),
         .addrb(ram_addr_rd[3]),
-        .doutb(s3_lut_rd[7:6])
+        .doutb(s4_lut_rd[7:6])
     );
 
-    reg [63:0] s3_bi_pixel;
-    reg [15:0] s3_vin_pixel;
-    reg [3:0] s3_pixel_bayer_dithered;
-    reg [3:0] s3_pixel_bn1b_dithered;
-    reg [15:0] s3_pixel_bn4b_dithered;
-    reg [15:0] s3_pixel_ed4b_dithered;
-    reg [3:0] s3_op_valid;
+    // Move to next stage
+    reg [63:0] s4_bi_pixel;
+    reg [15:0] s4_vin_pixel;
+    reg [3:0] s4_pixel_bayer_dithered;
+    reg [3:0] s4_pixel_bn1b_dithered;
+    reg [15:0] s4_pixel_bn4b_dithered;
+    reg [3:0] s4_op_valid;
+    
     always @(posedge clk) begin
-        s3_vin_pixel <= s2_vin_pixel;
-        s3_bi_pixel <= s2_bi_pixel;
+        s4_vin_pixel <= s3_vin_pixel;
+        s4_bi_pixel <= s3_bi_pixel;
         // For 1 bit dithering, only pick MSB of each pixel
-        s3_pixel_bayer_dithered <= s2_pixel_bayer_dithered;
-        s3_pixel_bn1b_dithered <= s2_pixel_bn1b_dithered;
-        s3_pixel_bn4b_dithered <= s2_pixel_bn4b_dithered;
-        s3_pixel_ed4b_dithered <= s2_pixel_ed4b_dithered;
-        s3_op_valid <= s2_op_valid;
+        s4_pixel_bayer_dithered <= s3_pixel_bayer_dithered;
+        s4_pixel_bn1b_dithered <= s3_pixel_bn1b_dithered;
+        s4_pixel_bn4b_dithered <= s3_pixel_bn4b_dithered;
+        s4_op_valid <= s3_op_valid;
     end
 
     // STAGE 4
     reg s4_active;
-    reg [3:0] s4_op_valid;
     always @(posedge clk) begin
         s4_active <= s3_active;
-        s4_op_valid <= s3_op_valid;
     end
 
     wire [7:0] pixel_comb;
     wire [63:0] bo_pixel_comb;
     generate
         for (i = 0; i < 4; i = i + 1) begin: gen_pix_proc
-            wire [3:0] proc_p_or = s3_vin_pixel[i*4+:4];
-            wire proc_p_bd = s3_pixel_bayer_dithered[i];
-            wire proc_p_n1 = s3_pixel_bn1b_dithered[i];
-            wire [3:0] proc_p_n4 = s3_pixel_bn4b_dithered[i*4+:4];
-            wire [3:0] proc_p_e4 = s3_pixel_ed4b_dithered[i*4+:4];
-            wire [15:0] proc_bi = s3_bi_pixel[i*16+:16];
+            wire [3:0] proc_p_or = s4_vin_pixel[i*4+:4];
+            wire proc_p_bd = s4_pixel_bayer_dithered[i];
+            wire proc_p_n1 = s4_pixel_bn1b_dithered[i];
+            wire [3:0] proc_p_n4 = s4_pixel_bn4b_dithered[i*4+:4];
+            wire [15:0] proc_bi = s4_bi_pixel[i*16+:16];
             wire [15:0] proc_bo;
-            wire [1:0] proc_lut_rd = s3_lut_rd[i*2+:2];
+            wire [1:0] proc_lut_rd = s4_lut_rd[i*2+:2];
             wire [1:0] proc_output;
 
             pixel_processing pixel_processing(
-                .csr_lutframe(csr_lutframe),
+                .csr_lutframe(csr_lut_frame),
                 .csr_mindrv(csr_mindrv),
                 .proc_p_or(proc_p_or),
                 .proc_p_bd(proc_p_bd),
                 .proc_p_n1(proc_p_n1),
                 .proc_p_n4(proc_p_n4),
-                .proc_p_e4(proc_p_e4),
                 .proc_bi(proc_bi),
                 .proc_bo(proc_bo),
                 .proc_lut_rd(proc_lut_rd),
@@ -682,26 +736,27 @@ module caster(
     assign epd_sdce0 = out_sdce;
 `else
     // Clock output
-    
-    // Glithcy output, should use clock gating cell
-    // assign epd_sdclk = clk_en ? ~clk : 1'b0;
-    // SPARTAN-6 specific output
-    ODDR2 #(
-        .DDR_ALIGNMENT("NONE"),
-        .INIT(1'b0),
-        .SRTYPE("SYNC")
-    ) sdclk_oddr (
-        .Q(epd_sdclk),
-        .C0(clk),
-        .C1(!clk),
-        .CE(1'b1),
-        .D0(1'b0),
-        .D1(1'b1),
-        .R(1'b0),
-        .S(1'b0)
-    );
+    `ifdef SIMULATION
+        assign epd_sdclk = ~clk;
+    `else
+        // SPARTAN-6 specific output
+        ODDR2 #(
+            .DDR_ALIGNMENT("NONE"),
+            .INIT(1'b0),
+            .SRTYPE("SYNC")
+        ) sdclk_oddr (
+            .Q(epd_sdclk),
+            .C0(clk),
+            .C1(!clk),
+            .CE(1'b1),
+            .D0(1'b0),
+            .D1(1'b1),
+            .R(1'b0),
+            .S(1'b0)
+        );
+    `endif
 
-    assign epd_sd = current_pixel;
+    assign epd_sd = {8'd0, current_pixel}; // In 8-bit mode, only use lower 8-bit
     assign epd_sdce0 = (scan_in_act) ? 1'b0 : 1'b1;
 `endif
 

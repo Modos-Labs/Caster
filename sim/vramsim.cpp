@@ -26,8 +26,8 @@
 #include <string.h>
 #include "vramsim.h"
 
-// 160*120*2 = 38.4KB = 4.8Kw
-#define VRAM_SIZE 8192
+// 320*240*2 = 153.6KB = 19.2Kw
+#define VRAM_SIZE 32768
 static uint64_t vram[VRAM_SIZE];
 static size_t rdptr, wrptr;
 static uint8_t last_trigger;

@@ -22,18 +22,26 @@ module csr(
     input wire spi_mosi,
     output reg spi_miso,
     // CSR io
-    output reg [5:0] csr_lutframe,
-    output reg [11:0] csr_lutaddr,
-    output reg [7:0] csr_lutwr,
-    output reg csr_lutwe,
-    output reg [11:0] csr_opleft,
-    output reg [11:0] csr_opright,
-    output reg [11:0] csr_optop,
-    output reg [11:0] csr_opbottom,
-    output reg [7:0] csr_opparam,
-    output reg [7:0] csr_oplength,
-    output reg [7:0] csr_opcmd,
-    output reg csr_ope,
+    output reg [5:0] csr_lut_frame,
+    output reg [11:0] csr_lut_addr,
+    output reg [7:0] csr_lut_wr,
+    output reg csr_lut_we,
+    output reg csr_osd_en,
+    output reg [11:0] csr_osd_left,
+    output reg [11:0] csr_osd_right,
+    output reg [11:0] csr_osd_top,
+    output reg [11:0] csr_osd_bottom,
+    output reg [11:0] csr_osd_addr,
+    output reg [7:0] csr_osd_wr,
+    output reg csr_osd_we,
+    output reg [11:0] csr_op_left,
+    output reg [11:0] csr_op_right,
+    output reg [11:0] csr_op_top,
+    output reg [11:0] csr_op_bottom,
+    output reg [7:0] csr_op_param,
+    output reg [7:0] csr_op_length,
+    output reg [7:0] csr_op_cmd,
+    output reg csr_op_en,
     output reg csr_en,
     output reg [7:0] csr_cfg_vfp,
     output reg [7:0] csr_cfg_vsync,
@@ -142,9 +150,10 @@ module csr(
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            csr_lutframe <= 6'd38; // Needs to match default waveform
-            csr_lutwe <= 1'b0;
-            csr_ope <= 1'b0;
+            csr_lut_frame <= 6'd38; // Needs to match default waveform
+            csr_lut_we <= 1'b0;
+            csr_op_en <= 1'b0;
+            csr_osd_en <= 1'b0;
             `ifdef CSR_SELFBOOT
             csr_en <= 1'b1;
             csr_cfg_vfp <= `DEFAULT_VFP;
@@ -162,34 +171,40 @@ module csr(
             `endif
         end
         else begin
-            csr_lutwe <= 1'b0;
-            csr_ope <= 1'b0;
+            // External write address increment
+            if (csr_lut_we) begin
+                csr_lut_we <= 1'b0;
+                csr_lut_addr <= csr_lut_addr + 'd1;
+            end
+            if (csr_osd_we) begin
+                csr_osd_we <= 1'b0;
+                csr_osd_addr <= csr_osd_addr + 'd1;
+            end
+            csr_op_en <= 1'b0;
             if (spi_req_wen) begin
                 case (spi_req_addr)
-                `CSR_LUT_FRAME: csr_lutframe <= spi_req_wdata[5:0];
-                `CSR_LUT_ADDR_HI: csr_lutaddr[11:8] <= spi_req_wdata[3:0];
-                `CSR_LUT_ADDR_LO: csr_lutaddr[7:0] <= spi_req_wdata;
+                `CSR_LUT_FRAME: csr_lut_frame <= spi_req_wdata[5:0];
+                `CSR_LUT_ADDR_HI: csr_lut_addr[11:8] <= spi_req_wdata[3:0];
+                `CSR_LUT_ADDR_LO: csr_lut_addr[7:0] <= spi_req_wdata;
                 `CSR_LUT_WR: begin
-                    csr_lutwr <= spi_req_wdata;
-                    csr_lutwe <= 1'b1;
+                    csr_lut_wr <= spi_req_wdata;
+                    csr_lut_we <= 1'b1;
                 end
-                `CSR_OP_LEFT_HI: csr_opleft[11:8] <= spi_req_wdata[3:0];
-                `CSR_OP_LEFT_LO: csr_opleft[7:0] <= spi_req_wdata;
-                `CSR_OP_RIGHT_HI: csr_opright[11:8] <= spi_req_wdata[3:0];
-                `CSR_OP_RIGHT_LO: csr_opright[7:0] <= spi_req_wdata;
-                `CSR_OP_TOP_HI: csr_optop[11:8] <= spi_req_wdata[3:0];
-                `CSR_OP_TOP_LO: csr_optop[7:0] <= spi_req_wdata;
-                `CSR_OP_BOTTOM_HI: csr_opbottom[11:8] <= spi_req_wdata[3:0];
-                `CSR_OP_BOTTOM_LO: csr_opbottom[7:0] <= spi_req_wdata;
-                `CSR_OP_PARAM: csr_opparam <= spi_req_wdata;
-                `CSR_OP_LENGTH: csr_oplength <= spi_req_wdata;
+                `CSR_OP_LEFT_HI: csr_op_left[11:8] <= spi_req_wdata[3:0];
+                `CSR_OP_LEFT_LO: csr_op_left[7:0] <= spi_req_wdata;
+                `CSR_OP_RIGHT_HI: csr_op_right[11:8] <= spi_req_wdata[3:0];
+                `CSR_OP_RIGHT_LO: csr_op_right[7:0] <= spi_req_wdata;
+                `CSR_OP_TOP_HI: csr_op_top[11:8] <= spi_req_wdata[3:0];
+                `CSR_OP_TOP_LO: csr_op_top[7:0] <= spi_req_wdata;
+                `CSR_OP_BOTTOM_HI: csr_op_bottom[11:8] <= spi_req_wdata[3:0];
+                `CSR_OP_BOTTOM_LO: csr_op_bottom[7:0] <= spi_req_wdata;
+                `CSR_OP_PARAM: csr_op_param <= spi_req_wdata;
+                `CSR_OP_LENGTH: csr_op_length <= spi_req_wdata;
                 `CSR_OP_CMD: begin
-                    csr_opcmd <= spi_req_wdata;
-                    csr_ope <= 1'b1;
+                    csr_op_cmd <= spi_req_wdata;
+                    csr_op_en <= 1'b1;
                 end
-                `CSR_ENABLE: begin
-                    csr_en <= spi_req_wdata[0];
-                end
+                `CSR_ENABLE: csr_en <= spi_req_wdata[0];
                 `CSR_CFG_V_FP: csr_cfg_vfp <= spi_req_wdata;
                 `CSR_CFG_V_SYNC: csr_cfg_vsync <= spi_req_wdata;
                 `CSR_CFG_V_BP: csr_cfg_vbp <= spi_req_wdata;
@@ -204,6 +219,21 @@ module csr(
                 `CSR_CFG_FBYTES_B1: csr_cfg_fbytes[15:8] <= spi_req_wdata;
                 `CSR_CFG_FBYTES_B0: csr_cfg_fbytes[7:0] <= spi_req_wdata;
                 `CSR_CFG_MINDRV: csr_cfg_mindrv <= spi_req_wdata[1:0];
+                `CSR_OSD_EN: csr_osd_en <= spi_req_wdata[0];
+                `CSR_OSD_LEFT_HI: csr_osd_left[11:8] <= spi_req_wdata[3:0];
+                `CSR_OSD_LEFT_LO: csr_osd_left[7:0] <= spi_req_wdata;
+                `CSR_OSD_RIGHT_HI: csr_osd_right[11:8] <= spi_req_wdata[3:0];
+                `CSR_OSD_RIGHT_LO: csr_osd_right[7:0] <= spi_req_wdata;
+                `CSR_OSD_TOP_HI: csr_osd_top[11:8] <= spi_req_wdata[3:0];
+                `CSR_OSD_TOP_LO: csr_osd_top[7:0] <= spi_req_wdata;
+                `CSR_OSD_BOTTOM_HI: csr_osd_bottom[11:8] <= spi_req_wdata[3:0];
+                `CSR_OSD_BOTTOM_LO: csr_osd_bottom[7:0] <= spi_req_wdata;
+                `CSR_OSD_ADDR_HI: csr_osd_addr[11:8] <= spi_req_wdata[3:0];
+                `CSR_OSD_ADDR_LO: csr_osd_addr[7:0] <= spi_req_wdata;
+                `CSR_OSD_WR: begin
+                    csr_osd_wr <= spi_req_wdata;
+                    csr_osd_we <= 1'b1;
+                end
                 default: begin
                     // no op
                 end
@@ -212,7 +242,10 @@ module csr(
         end
     end
 
-    assign spi_autoinc = (spi_req_addr != `CSR_LUT_WR) && (spi_req_addr != `CSR_OP_CMD);
+    assign spi_autoinc =
+        (spi_req_addr != `CSR_LUT_WR) &&
+        (spi_req_addr != `CSR_OSD_WR) &&
+        (spi_req_addr != `CSR_OP_CMD);
 
 endmodule
 `default_nettype wire

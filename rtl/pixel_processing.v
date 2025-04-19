@@ -15,12 +15,11 @@
 `include "defines.vh"
 module pixel_processing(
     input  wire [5:0]  csr_lutframe,// Total frames in LUT
-    input  wire [1:0]  csr_mindrv,    // Dynamic frame rate cap setting
+    input  wire [1:0]  csr_mindrv,  // Dynamic frame rate cap setting
     input  wire [3:0]  proc_p_or,   // Original pixel
     input  wire        proc_p_bd,   // Bayer dithered pixel to 1-bit
     input  wire        proc_p_n1,   // Blue noise dithered pixel to 1-bit
     input  wire [3:0]  proc_p_n4,   // Blue noise dithered pixel to 4-bit
-    input  wire [3:0]  proc_p_e4,   // Error diffusion dithered pixel to 4-bit
     input  wire [15:0] proc_bi,     // Pixel state input from VRAM
     output reg  [15:0] proc_bo,     // Pixel state output to VRAM
     input  wire [1:0]  proc_lut_rd, // Read out from LUT
@@ -37,7 +36,7 @@ module pixel_processing(
     // Bit 15-12: Mode
     // Bit 13-12 is shared
     localparam MODE_MANUAL_LUT_NO_DITHER = 2'd0; // 00xx
-    localparam MODE_MANUAL_LUT_ERROR_DIFFUSION = 2'd1; // 01xx
+    localparam MODE_MANUAL_LUT_BLUE_NOISE = 2'd1; // 01xx
     localparam MODE_FAST_MONO_NO_DITHER = 4'd8; // 1000
     localparam MODE_FAST_MONO_BAYER = 4'd9; // 1001
     localparam MODE_FAST_MONO_BLUE_NOISE = 4'd10; // 1010
@@ -172,7 +171,6 @@ module pixel_processing(
     localparam DITHER_BAYER = 3'b001;
     localparam DITHER_BN_1BIT = 3'b010;
     localparam DITHER_BN_4BIT = 3'b011;
-    localparam DITHER_ED_4BIT = 3'b100;
 
     // EX op decoding sorta
     wire manual_lut_update_en = op_valid && (op_cmd == `OP_EXT_REDRAW);
@@ -189,9 +187,9 @@ module pixel_processing(
             pixel_basemode = BASEMODE_MANUAL_LUT;
             pixel_dither = DITHER_NONE;
         end
-        MODE_MANUAL_LUT_ERROR_DIFFUSION: begin
+        MODE_MANUAL_LUT_BLUE_NOISE: begin
             pixel_basemode = BASEMODE_MANUAL_LUT;
-            pixel_dither = DITHER_ED_4BIT;
+            pixel_dither = DITHER_BN_4BIT;
         end
         default: begin
             case (pixel_mode) 
@@ -250,7 +248,7 @@ module pixel_processing(
         (pixel_dither == DITHER_NONE) ? (proc_p_or) :
         (pixel_dither == DITHER_BAYER) ? ({4{proc_p_bd}}) :
         (pixel_dither == DITHER_BN_1BIT) ? ({4{proc_p_n1}}) :
-        (pixel_dither == DITHER_BN_4BIT) ? (proc_p_n4) : {proc_p_e4};
+        (pixel_dither == DITHER_BN_4BIT) ? (proc_p_n4) : {4'd0};
 
     wire [3:0] proc_vinnd = force_clear ? clear_color : proc_p_li[7:4];
 
@@ -499,8 +497,8 @@ module pixel_processing(
             case (op_param)
             `SETMODE_MANUAL_LUT_NO_DITHER:
                 proc_bo = {MODE_MANUAL_LUT_NO_DITHER, 4'd0, 6'd0, 4'd15};
-            `SETMODE_MANUAL_LUT_ERROR_DIFFUSION:
-                proc_bo = {MODE_MANUAL_LUT_ERROR_DIFFUSION, 4'd0, 6'd0, 4'd15};
+            `SETMODE_MANUAL_LUT_BLUE_NOISE:
+                proc_bo = {MODE_MANUAL_LUT_BLUE_NOISE, 4'd0, 6'd0, 4'd15};
             `SETMODE_FAST_MONO_NO_DITHER:
                 proc_bo = `INIT_FAST_MONO_ND;
             `SETMODE_FAST_MONO_BAYER:

@@ -32,7 +32,19 @@
 `define CSR_CFG_FBYTES_B2   8'd27
 `define CSR_CFG_FBYTES_B1   8'd28
 `define CSR_CFG_FBYTES_B0   8'd29
-`define CSR_CFG_MINDRV        8'd30
+`define CSR_CFG_MINDRV      8'd30
+`define CSR_OSD_EN          8'd31
+`define CSR_OSD_LEFT_HI     8'd32
+`define CSR_OSD_LEFT_LO     8'd33
+`define CSR_OSD_RIGHT_HI    8'd34
+`define CSR_OSD_RIGHT_LO    8'd35
+`define CSR_OSD_TOP_HI      8'd36
+`define CSR_OSD_TOP_LO      8'd37
+`define CSR_OSD_BOTTOM_HI   8'd38
+`define CSR_OSD_BOTTOM_LO   8'd39
+`define CSR_OSD_ADDR_HI     8'd40
+`define CSR_OSD_ADDR_LO     8'd41
+`define CSR_OSD_WR          8'd42
 `define CSR_STATUS          8'd128
 
 // FB operations
@@ -48,7 +60,7 @@
 `define OP_EXT_SETMODE      8'd1
 
 `define SETMODE_MANUAL_LUT_NO_DITHER       8'd0
-`define SETMODE_MANUAL_LUT_ERROR_DIFFUSION 8'd1
+`define SETMODE_MANUAL_LUT_BLUE_NOISE      8'd1
 `define SETMODE_FAST_MONO_NO_DITHER        8'd2
 `define SETMODE_FAST_MONO_BAYER            8'd3
 `define SETMODE_FAST_MONO_BLUE_NOISE       8'd4
@@ -56,11 +68,11 @@
 `define SETMODE_AUTO_LUT_NO_DITHER         8'd6
 `define SETMODE_AUTO_LUT_BLUE_NOISE        8'd7
 
-`define OUTPUT_16B
+//`define OUTPUT_16B
 
 // Define this to enable operation by default after reset
 // Used for debugging purpose only
-`define CSR_SELFBOOT
+//`define CSR_SELFBOOT
 
 `define DEFAULT_VFP         8'd10
 `define DEFAULT_VSYNC       8'd1

@@ -54,6 +54,9 @@ Vcaster *core;
 VerilatedVcdC *trace;
 uint64_t tickcount;
 
+// Legacy function required by some platforms/ versions of Verilator
+double sc_time_stamp() { return 0; }
+
 void testmain(void) {
     static int step = 0;
     // This function is called every tick
@@ -62,12 +65,24 @@ void testmain(void) {
         spi_write_reg8(CSR_CFG_V_FP, 3);
         spi_write_reg8(CSR_CFG_V_SYNC, 1);
         spi_write_reg8(CSR_CFG_V_BP, 2);
-        spi_write_reg16(CSR_CFG_V_ACT, 120);
+        spi_write_reg16(CSR_CFG_V_ACT, 240);
         spi_write_reg8(CSR_CFG_H_FP, 3);
         spi_write_reg8(CSR_CFG_H_SYNC, 1);
         spi_write_reg8(CSR_CFG_H_BP, 2);
-        spi_write_reg16(CSR_CFG_H_ACT, 40);
+        spi_write_reg16(CSR_CFG_H_ACT, 80);
         spi_write_reg8(CSR_CFG_MINDRV, 1);
+
+        // Enable OSD
+        spi_write_reg16(CSR_OSD_LEFT, 0);
+        spi_write_reg16(CSR_OSD_RIGHT, 256/4);
+        spi_write_reg16(CSR_OSD_TOP, 0);
+        spi_write_reg16(CSR_OSD_BOTTOM, 128);
+        spi_write_reg16(CSR_OSD_ADDR, 0);
+        for (int i = 0; i < 4096; i++) {
+            spi_write_reg8(CSR_OSD_WR, 0x55);
+        }
+        spi_write_reg8(CSR_OSD_EN, 1);
+
         spi_write_reg8(CSR_ENABLE, 1); // Enable refresh
         // Read back status
         spi_write_reg8(CSR_STATUS, 0);
