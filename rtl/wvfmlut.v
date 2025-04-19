@@ -29,9 +29,9 @@ module wvfmlut(
     wire [7:0] bram_douta;
     wire [7:0] bram_doutb;
 
-    bramdp #(
-        .ABITS(12),
-        .DBITS(8),
+    mu_ram_2rw #(
+        .AW(12),
+        .DW(8),
         .INITIALIZE(1),
         .INIT_FILE("default_waveform.mem")
     ) bramdp0 (

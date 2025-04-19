@@ -75,9 +75,9 @@ module blue_noise_dithering #(
     end
     endgenerate
 
-    bramdp #(
-        .ABITS(12),
-        .DBITS(8),
+    mu_ram_2rw #(
+        .AW(12),
+        .DW(8),
         .INITIALIZE(1),
         .INIT_FILE("noise.mem")
     ) bramdp0 (
@@ -93,9 +93,9 @@ module blue_noise_dithering #(
         .doutb(b1)
     );
 
-    bramdp #(
-        .ABITS(12),
-        .DBITS(8),
+    mu_ram_2rw #(
+        .AW(12),
+        .DW(8),
         .INITIALIZE(1),
         .INIT_FILE("noise.mem")
     ) bramdp1 (

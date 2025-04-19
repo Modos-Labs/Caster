@@ -46,9 +46,9 @@ module error_diffusion_dithering #(
     wire [EB_ABITS-1:0] eb_wptr;
     wire eb_we;
     wire [EB_DBITS-1:0] eb_wr;
-    bramdp #(
-        .ABITS(EB_ABITS),
-        .DBITS(EB_DBITS)
+    mu_ram_2rw #(
+        .AW(EB_ABITS),
+        .DW(EB_DBITS)
     ) error_buffer (
         .clka(clk),
         .wea(eb_we),
