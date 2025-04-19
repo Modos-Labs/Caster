@@ -1,0 +1,3 @@
+[submodule "rtl/mulib"]
+	path = rtl/mulib
+	url = git@gitlab.com:zephray/mulib
