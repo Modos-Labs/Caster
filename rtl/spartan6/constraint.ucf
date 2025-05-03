@@ -5,6 +5,7 @@ CONFIG MCB_PERFORMANCE= EXTENDED;
 # Global clock input
 NET "CLK_IN"        IOSTANDARD = LVCMOS33;
 NET "CLK_IN"        LOC = "M9";
+#NET "CLK_IN"        LOC = "K11";
 
 NET "CLK_IN"        TNM_NET = "CLK33";
 TIMESPEC "TS_CLK33" = PERIOD "CLK33" 30 ns HIGH 50 %;
@@ -12,10 +13,15 @@ TIMESPEC "TS_CLK33" = PERIOD "CLK33" 30 ns HIGH 50 %;
 NET "vin/vin_fpdlink/fpdlink_serdes_in/fpdlink_serdes_clkin/pclk_bufio" TNM_NET = LVDS_CLK;
 TIMESPEC TS_LVDS_CLK = PERIOD "LVDS_CLK" 81 MHz HIGH 50%;
 
-NET "vin/vin_dpi/dpi_pclk_buf" TNM_NET = DPI_CLK;
-TIMESPEC TS_DPI_CLK = PERIOD "DPI_CLK" 162 MHz HIGH 50%;
+NET "DPI_PCLK" TNM_NET = DPI_CLK;
+TIMESPEC TS_DPI_CLK = PERIOD "DPI_CLK" 81 MHz HIGH 50%;
+
+NET "clk_epdc" TNM_NET = PCLK;
+TIMESPEC TS_PCLK = PERIOD "PCLK" 41 MHz HIGH 50%;
 
 #NET "mif_rst" TIG;
+
+#INST "vin/vin_fpdlink/fpdlink_serdes_in/fpdlink_serdes_clkin/rxpll" LOC = PLL_ADV_X0Y0;
 
 ##################################################################################
 # Timing Ignore constraints for paths crossing the clock domain 
@@ -179,14 +185,19 @@ NET "LVDS_ODD_CK_P"  IOSTANDARD = LVDS_33;
 NET "LVDS_ODD_CK_P"  DIFF_TERM = "TRUE";
 NET "LVDS_ODD_CK_N"  IOSTANDARD = LVDS_33;
 NET "LVDS_ODD_CK_N"  DIFF_TERM = "TRUE";
-# CK is not dinverted
-NET "LVDS_ODD_CK_P"  LOC = "R7";
-NET "LVDS_ODD_CK_N"  LOC = "T7";
-
 NET "LVDS_ODD_P[*]"  IOSTANDARD = LVDS_33;
 NET "LVDS_ODD_P[*]"  DIFF_TERM = "TRUE";
 NET "LVDS_ODD_N[*]"  IOSTANDARD = LVDS_33;
 NET "LVDS_ODD_N[*]"  DIFF_TERM = "TRUE";
+NET "LVDS_EVEN_P[*]" IOSTANDARD = LVDS_33;
+NET "LVDS_EVEN_P[*]" DIFF_TERM = "TRUE";
+NET "LVDS_EVEN_N[*]" IOSTANDARD = LVDS_33;
+NET "LVDS_EVEN_N[*]" DIFF_TERM = "TRUE";
+
+# CK is not dinverted
+NET "LVDS_ODD_CK_P"  LOC = "R7";
+NET "LVDS_ODD_CK_N"  LOC = "T7";
+
 # ODD A is not inverted
 NET "LVDS_ODD_P[0]"  LOC = "P4";
 NET "LVDS_ODD_N[0]"  LOC = "T4";
@@ -196,11 +207,6 @@ NET "LVDS_ODD_N[1]"  LOC = "T5";
 # ODD C is not inverted
 NET "LVDS_ODD_P[2]"  LOC = "P6";
 NET "LVDS_ODD_N[2]"  LOC = "T6";
-
-NET "LVDS_EVEN_P[*]" IOSTANDARD = LVDS_33;
-NET "LVDS_EVEN_P[*]" DIFF_TERM = "TRUE";
-NET "LVDS_EVEN_N[*]" IOSTANDARD = LVDS_33;
-NET "LVDS_EVEN_N[*]" DIFF_TERM = "TRUE";
 
 # EVEN A is not inverted
 NET "LVDS_EVEN_P[0]" LOC = "P8";

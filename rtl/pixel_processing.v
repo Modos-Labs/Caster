@@ -229,8 +229,8 @@ module pixel_processing(
 
     wire [3:0] clear_color =
         (pixel_basemode == BASEMODE_MANUAL_LUT) ? 4'hF :
-        ((op_framecnt[4:3] == 2'b11) ? 4'h0 :
-        (op_framecnt[5] ? 4'h0 : 4'hF));
+        ((op_framecnt[3:2] == 2'b11) ? 4'h0 :
+        (op_framecnt[4] ? 4'h0 : 4'hF));
 
     /* verilator lint_off UNUSEDSIGNAL */
     // Only 4 MSBs used
@@ -526,9 +526,9 @@ module pixel_processing(
             // x111xxx - 0-7 / 64-71 noop
             // 1xxxxxx - 8-63 black
             // 0xxxxxx - 72-127 white
-            if (op_framecnt[4:2] == 3'b111)
+            if (op_framecnt[3:1] == 3'b111)
                 proc_output = `NO_DRIVE;
-            else if (op_framecnt[5] == 1'b1)
+            else if (op_framecnt[4] == 1'b1)
                 proc_output = `DRIVE_BLACK;
             else
                 proc_output = `DRIVE_WHITE;

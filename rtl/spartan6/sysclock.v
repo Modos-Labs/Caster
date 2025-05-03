@@ -48,7 +48,7 @@ module sysclock(
     DCM_SP #(
         .CLKDV_DIVIDE          (2.000),
         .CLKFX_DIVIDE          (2),
-        .CLKFX_MULTIPLY        (20),
+        .CLKFX_MULTIPLY        (2),
         .CLKIN_DIVIDE_BY_2     ("FALSE"),
         .CLKIN_PERIOD          (30.0),
         .CLKOUT_PHASE_SHIFT    ("NONE"),
@@ -95,10 +95,11 @@ module sysclock(
     );
 
     // MIG generates its own BUFG, no needs for buffering here
-    BUFG clkddr_buf (
-        .O (clk_ddr),
-        .I (clkfx)
-    );
+    // BUFG clkddr_buf (
+    //     .O (clk_ddr),
+    //     .I (clkfx)
+    // );
+    assign clk_ddr = clkfb;
 
     // System runs at input clock (33MHz)
     assign clk_sys = clkfb;

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <Project NoOfControllers="1" >
     <ModuleName>s6_ddr3</ModuleName>
     <TargetFPGA>xc6slx16-ftg256/-3</TargetFPGA>
@@ -9,7 +9,7 @@
         <EnableVoltageRange>0</EnableVoltageRange>
         <DataMask>1</DataMask>
         <CustomPart>FALSE</CustomPart>
-        <NewPartName></NewPartName>
+        <NewPartName/>
         <RowAddress>13</RowAddress>
         <ColAddress>10</ColAddress>
         <BankAddress>3</BankAddress>
@@ -33,9 +33,9 @@
         <DataClass>Class II</DataClass>
         <InputPinTermination>UNCALIB_TERM</InputPinTermination>
         <DataTermination>50 Ohms</DataTermination>
-        <CalibrationRowAddress></CalibrationRowAddress>
-        <CalibrationColumnAddress></CalibrationColumnAddress>
-        <CalibrationBankAddress></CalibrationBankAddress>
+        <CalibrationRowAddress/>
+        <CalibrationColumnAddress/>
+        <CalibrationBankAddress/>
         <SystemClock>Single-Ended</SystemClock>
         <BypassCalibration>1</BypassCalibration>
         <DebugSignals>Disable</DebugSignals>

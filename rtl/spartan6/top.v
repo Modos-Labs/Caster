@@ -51,7 +51,7 @@ module top(
     input wire [2:0] LVDS_ODD_P,
     input wire [2:0] LVDS_ODD_N,
     input wire [2:0] LVDS_EVEN_P,
-    input wire [2:0] LVDS_EVEN_N,
+    input wire [2:0] LVDS_EVEN_N,   
     input wire DPI_PCLK,
     input wire DPI_DE,
     input wire DPI_VSYNC,
@@ -66,7 +66,7 @@ module top(
     output wire LED
     );
     
-    parameter COLORMODE = "DES";
+    parameter COLORMODE = "MONO";
     
     parameter SIMULATION = "FALSE";
     parameter CALIB_SOFT_IP = "TRUE";
@@ -82,7 +82,7 @@ module top(
     wire mif_rst;
     
     wire clk_epdc;
-
+    // For compatibility with r0.12 boards
     wire dcm_locked;
     sysclock sysclock(
         // Clock in ports
@@ -94,9 +94,23 @@ module top(
         .reset(1'b0),
         .locked(dcm_locked)
     );
-
+    
     wire c3_sys_rst = !dcm_locked;
     assign mif_rst = c3_sys_rst;
+
+/*
+    reg c3_sys_rst = 1'b1;
+    always @(posedge clk_sys) begin
+        c3_sys_rst <= 1'b0;
+    end
+    
+    IBUFG clkin1_buf (
+        .O (clk_sys),
+        .I (CLK_IN)
+    );
+    assign clk_ddr = clk_sys;
+    assign mif_rst = c3_sys_rst;
+*/
 
     // Global frame trigger & control
     wire b_trigger;
@@ -466,46 +480,57 @@ module top(
         .TRIG0(ila_signals)
     );
 
-    assign ila_signals[0] = dcm_locked;
-    assign ila_signals[1] = ddr_calib_done;
-    assign ila_signals[2] = sys_rst;
-    assign ila_signals[3] = memif_error;
-    // assign ila_signals[4] = v_vs;
-    // assign ila_signals[5] = v_hs;
-    // assign ila_signals[6] = v_de;
-//    assign ila_signals[7] = v_pclk;
-//    assign ila_signals[8] = dbg_hsync;
-//    assign ila_signals[9] = dbg_vsync;
-//    assign ila_signals[10] = dbg_de;
-//    assign ila_signals[11] = dbg_pll_lck;
+//    assign ila_signals[0] = c3_sys_rst;
+//    assign ila_signals[1] = ddr_calib_done;
+//    assign ila_signals[2] = sys_rst;
+//    assign ila_signals[3] = memif_error;
+//    // assign ila_signals[4] = v_vs;
+//    // assign ila_signals[5] = v_hs;
+//    // assign ila_signals[6] = v_de;
+////    assign ila_signals[7] = v_pclk;
+////    assign ila_signals[8] = dbg_hsync;
+////    assign ila_signals[9] = dbg_vsync;
+////    assign ila_signals[10] = dbg_de;
+////    assign ila_signals[11] = dbg_pll_lck;
+//
+//    //assign ila_signals[6:4] = debug[2:0];
+//
+//   assign ila_signals[7] = vin_ready; // vi_fifo_rd_en
+//   assign ila_signals[8] = vin_valid; // vi_fifo_rd not empty
+//   assign ila_signals[9] = memif_enable;
+//   assign ila_signals[10] = memif_trigger;
+//   assign ila_signals[11] = pix_read_valid; // bi_fifo_wr_en
+//   assign ila_signals[12] = bi_fifo_full;
+//   assign ila_signals[13] = bi_ready;
+//   assign ila_signals[14] = bi_valid; // bi_fifo_rd not empty
+//   assign ila_signals[15] = bo_valid;
+//   assign ila_signals[16] = bo_fifo_full;
+//   assign ila_signals[17] = pix_write_ready; // bo_fifo_rd_en
+//   assign ila_signals[18] = bo_fifo_empty;
+////   //assign ila_signals[19] = dbg_scan_state[0];
+//   assign ila_signals[19] = dbg_scan_state[1];
+////   //assign ila_signals[15] = vin_vsync;
+//   assign ila_signals[20] = vin_pixel[15]; // sneak peak of pixel
+//
+//    assign ila_signals[4] = spi_cs;
+//    assign ila_signals[5] = spi_sck;
+//    assign ila_signals[6] = spi_mosi;
+//    
+//    assign ila_signals[23:21] = 3'd0; 
+////
+////    assign ila_signals[7] = dbg_spi_req_wen;
+////    assign ila_signals[15:8] = dbg_spi_req_addr;
+////    assign ila_signals[23:16] = dbg_spi_req_wdata;
+////    
+////    assign ila_signals[31:24] = dbg_scan_v_cnt[7:0];
+////    assign ila_signals[31:21] = dbg_scan_v_cnt;
+//    assign ila_signals[31:24] = debug;
 
-   assign ila_signals[7] = vin_ready; // vi_fifo_rd_en
-   assign ila_signals[8] = vin_valid; // vi_fifo_rd not empty
-   assign ila_signals[9] = memif_enable;
-   assign ila_signals[10] = memif_trigger;
-   assign ila_signals[11] = pix_read_valid; // bi_fifo_wr_en
-   assign ila_signals[12] = bi_fifo_full;
-   assign ila_signals[13] = bi_ready;
-   assign ila_signals[14] = bi_valid; // bi_fifo_rd not empty
-   assign ila_signals[15] = bo_valid;
-   assign ila_signals[16] = bo_fifo_full;
-   assign ila_signals[17] = pix_write_ready; // bo_fifo_rd_en
-   assign ila_signals[18] = bo_fifo_empty;
-   //assign ila_signals[19] = dbg_scan_state[0];
-   assign ila_signals[19] = dbg_scan_state[1];
-   //assign ila_signals[15] = vin_vsync;
-   assign ila_signals[20] = vin_pixel[15]; // sneak peak of pixel
 
-    assign ila_signals[4] = spi_cs;
-    assign ila_signals[5] = spi_sck;
-    assign ila_signals[6] = spi_mosi;
-
-    // assign ila_signals[7] = dbg_spi_req_wen;
-    // assign ila_signals[15:8] = dbg_spi_req_addr;
-    // assign ila_signals[23:16] = dbg_spi_req_wdata;
-    
-    //assign ila_signals[31:24] = dbg_scan_v_cnt[7:0];
-    assign ila_signals[31:21] = dbg_scan_v_cnt;
+    assign ila_signals[0] = vin_vsync;
+    assign ila_signals[1] = vin_valid;
+    assign ila_signals[2] = vin_ready;
+    assign ila_signals[31:3] = vin_pixel[31:3];
 
     assign LED = |(epd_sd_caster[7:0]);
 

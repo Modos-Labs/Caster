@@ -19,10 +19,10 @@ module vin_dpi(
     input  wire         dpi_hsync,
     input  wire         dpi_pclk,
     input  wire         dpi_de,
-    input  wire [23:0]  dpi_pixel,
+    input  wire [17:0]  dpi_pixel,
     output reg          v_vsync,
     output reg          v_hsync,
-    output reg          v_pclk,
+    output wire         v_pclk,
     output reg          v_de,
     output reg  [35:0]  v_pixel,
     output wire         v_halfpclk,
@@ -31,8 +31,10 @@ module vin_dpi(
 
     wire locked_int;
     wire [7:0] status_int;
-    wire clkfb;
+    wire clk0_buf;
     wire clk0;
+    wire clk180_buf;
+    wire clk180;
     wire clkfx;
     wire dpi_pclk_buf;
     IBUFG pclkin_buf (
@@ -42,7 +44,7 @@ module vin_dpi(
 
     DCM_SP #(
         .CLKDV_DIVIDE          (2.000),
-        .CLKFX_DIVIDE          (8),
+        .CLKFX_DIVIDE          (4),
         .CLKFX_MULTIPLY        (2),
         .CLKIN_DIVIDE_BY_2     ("FALSE"),
         .CLKIN_PERIOD          (6.0), // 166MHz max
@@ -55,11 +57,11 @@ module vin_dpi(
     dcm_sp_inst (
         // Input clock
         .CLKIN                 (dpi_pclk_buf),
-        .CLKFB                 (clkfb),
+        .CLKFB                 (clk0_buf),
         // Output clocks
         .CLK0                  (clk0),
         .CLK90                 (),
-        .CLK180                (),
+        .CLK180                (clk180),
         .CLK270                (),
         .CLK2X                 (),
         .CLK2X180              (),
@@ -80,70 +82,60 @@ module vin_dpi(
         .DSSEN                 (1'b0)
     );
 
-    BUFG clkf_buf (
-        .O (clkfb),
+    BUFG clk0_bufg (
+        .O (clk0_buf),
         .I (clk0)
+    );
+    
+    BUFG clk180_bufg (
+        .O(clk180_buf),
+        .I(clk180)
     );
 
     wire vi_rst = !locked_int;
     assign v_valid = locked_int;
 
-    // Register all inputs first
-    wire pclk = clk0;
-    reg hsync, vsync, de;
-    reg [17:0] pixelin;
-    always @(posedge pclk) begin
-        hsync <= dpi_hsync;
-        vsync <= dpi_vsync;
-        de <= dpi_de;
-        pixelin <= dpi_pixel;
+    wire [20:0] insig = {dpi_hsync, dpi_vsync, dpi_de, dpi_pixel};
+    wire [20:0] outsig_r;
+    wire [20:0] outsig_f;
+    genvar i;
+    generate for (i = 0; i < 21; i = i + 1) begin
+        IDDR2 #(
+            .DDR_ALIGNMENT("C0"), // Sets output alignment to "NONE", "C0" or "C1" 
+            .INIT_Q0(1'b0), // Sets initial state of the Q0 output to 1'b0 or 1'b1
+            .INIT_Q1(1'b0), // Sets initial state of the Q1 output to 1'b0 or 1'b1
+            .SRTYPE("SYNC") // Specifies "SYNC" or "ASYNC" set/reset
+        ) iddr2_hsync (
+            .Q0(outsig_r[i]), // 1-bit output captured with C0 clock
+            .Q1(outsig_f[i]), // 1-bit output captured with C1 clock
+            .C0(clk0_buf), // 1-bit clock input
+            .C1(clk180_buf), // 1-bit clock input
+            .CE(1'b1), // 1-bit clock enable input
+            .D(insig[i]),   // 1-bit DDR data input
+            .R(1'b0),   // 1-bit reset input
+            .S(1'b0)    // 1-bit set input
+        );
     end
+    endgenerate
+    
+    wire bhsync = outsig_r[20];
+    wire bvsync = outsig_r[19];
+    wire bde = outsig_r[18];
+    //wire [17:0] bpixelin = outsig[17:0];
+    wire [17:0] bpixelin_r = outsig_r[17:0];
+    wire [17:0] bpixelin_f = outsig_f[17:0];
+
+    always @(posedge clk0_buf) begin
+        v_hsync <= bhsync;
+        v_vsync <= bvsync;
+        v_de <= bde;
+        v_pixel <= {bpixelin_f, bpixelin_r};
+    end
+    
+    assign v_pclk = clk0;
 
     // The user should buffer the clock with BUFG / BUFGMUX
     assign v_halfpclk = clkfx;
-
-    reg [1:0] ignore;
-    wire ignored = ignore != 'd0;
-    reg [17:0] pixbuf;
-    reg last_de, last_vsync;
-    
-    reg [10:0] hcntr; 
-
-    always @(posedge pclk or posedge vi_rst) begin
-        if (vi_rst) begin
-            v_pclk <= 1'b0;
-            v_de <= 1'b0;
-            ignore <= 2'd3; // ignore first few frames
-        end
-        else begin
-            if (vsync && !last_vsync && (ignore != 'd0)) begin
-                ignore <= ignore - 'd1;
-            end
-
-            if ((de && !last_de) || v_pclk) begin
-                // re-sync when de is first high
-                pixbuf <= pixelin;
-                v_pclk <= 1'b0;
-                hcntr <= 'd0;
-            end
-            else begin
-                v_pclk <= 1'b1;
-                if (hcntr < 'd800) begin
-                    v_de <= de && !ignored;
-                end
-                else begin
-                    v_de <= 'd0;
-                    hcntr <= hcntr + 'd1;
-                end
-                v_pixel <= {pixbuf, pixelin};
-                v_hsync <= hsync && !ignored;
-                v_vsync <= vsync && !ignored;
-            end
-
-            last_de <= de;
-            last_vsync <= vsync;
-        end
-    end
 
 endmodule
 `default_nettype wire

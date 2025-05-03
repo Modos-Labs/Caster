@@ -146,6 +146,7 @@ module csr(
     assign spi_req_rdata =
         (spi_req_addr == `CSR_STATUS) ?
             {mig_error, mif_error, sys_ready, op_busy, op_queue, 2'd0, csr_en} :
+        (spi_req_addr == `CSR_ID0) ? 8'h35 :
         8'd0;
 
     always @(posedge clk or posedge rst) begin

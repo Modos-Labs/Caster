@@ -50,7 +50,7 @@ module fpdlink_serdes_clkin(
     wire pclk;
     wire fbclk_bufio;
     wire pclk_bufio;
-    
+
     PLL_ADV #(
         .BANDWIDTH("OPTIMIZED"),
         .CLKFBOUT_MULT(7),

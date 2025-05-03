@@ -99,9 +99,6 @@ module vin(
             v_dpi_pixel[17:12], v_dpi_pixel[17:16],
             v_dpi_pixel[11:6], v_dpi_pixel[11:10],
             v_dpi_pixel[5:0], v_dpi_pixel[5:4]};
-    
-    assign debug[7:6] = v_dpi_pixel_rgb888[23:22];
-    assign debug[5:4] = v_dpi_pixel_rgb888[47:46];
 
     // Mux between 2 inputs into the 1:2 FIFO
     // Prioritize FPD Link Input
@@ -139,9 +136,15 @@ module vin(
         .out_valid(vi_wr_en)
     );
     
-    assign debug[3:2] = vi_pixel_rgb[47:46];
-    assign debug[1:0] = vi_pixel[15:14];
-
+//    assign debug[0] = v_dpi_vsync;
+//    assign debug[1] = v_dpi_hsync;
+//    assign debug[2] = v_dpi_de;
+//    assign debug[3] = v_dpi_valid;
+//    assign debug[4] = dpi_pixel[5];
+//    assign debug[5] = dpi_pixel[4];
+//    assign debug[6] = dpi_pixel[11];
+//    assign debug[7] = dpi_pixel[10];
+    assign debug[7:0] = 0;
     // Output clock mux
     BUFGMUX oclk_mux (
         .S(vi_select),
@@ -149,11 +152,7 @@ module vin(
         .I1(v_fpdlink_halfpclk),
         .O(v_pclk)
     );
-    /*BUFG oclk_bufg (
-        .I(v_fpdlink_halfpclk),
-        .O(v_pclk)
-    );*/
-    
+
     wire [15:0] lr_pixel;
     wire lr_pixel_en;
     /*line_reverse line_reverse(
@@ -164,7 +163,7 @@ module vin(
         .pix_out(lr_pixel),
         .pix_out_en(lr_pixel_en)
     );*/
-        
+
     vi_fifo vi_fifo (
         .rst(v_vsync), // input rst, reset at each frame
         // Write port
@@ -184,9 +183,9 @@ module vin(
     // Sync vs signal to clk_sys clock domain
     mu_dsync vs_sync (
         .iclk(vi_pclk),
-        .i(vi_vsync),
-        .clko(v_pclk),
-        .o(v_vsync)
+        .in(vi_vsync),
+        .oclk(v_pclk),
+        .out(v_vsync)
     );
 
 endmodule

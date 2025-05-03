@@ -46,6 +46,7 @@
 `define CSR_OSD_ADDR_LO     8'd41
 `define CSR_OSD_WR          8'd42
 `define CSR_STATUS          8'd128
+`define CSR_ID0             8'd129
 
 // FB operations
 // Redraw:
@@ -74,23 +75,79 @@
 // Used for debugging purpose only
 //`define CSR_SELFBOOT
 
+//`define DEFAULT_VFP         8'd10
+//`define DEFAULT_VSYNC       8'd1
+//`define DEFAULT_VBP         8'd4
+//`define DEFAULT_VACT        12'd1034
+//`define DEFAULT_HFP         8'd16
+//`define DEFAULT_HSYNC       8'd2
+//`define DEFAULT_HBP         8'd2
+//`define DEFAULT_HACT        12'd600
+
+//`define DEFAULT_VFP         8'd10
+//`define DEFAULT_VSYNC       8'd1
+//`define DEFAULT_VBP         8'd2
+//`define DEFAULT_VACT        12'd1680
+//`define DEFAULT_HFP         8'd16
+//`define DEFAULT_HSYNC       8'd2
+//`define DEFAULT_HBP         8'd2
+//`define DEFAULT_HACT        12'd558
+
+//`define DEFAULT_VFP         8'd10
+//`define DEFAULT_VSYNC       8'd1
+//`define DEFAULT_VBP         8'd2
+//`define DEFAULT_VACT        12'd1680
+//`define DEFAULT_HFP         8'd16
+//`define DEFAULT_HSYNC       8'd2
+//`define DEFAULT_HBP         8'd2
+//`define DEFAULT_HACT        12'd560
+
+// `define DEFAULT_VFP         8'd5
+// `define DEFAULT_VSYNC       8'd1
+// `define DEFAULT_VBP         8'd2
+// `define DEFAULT_VACT        12'd1404
+// `define DEFAULT_HFP         8'd6
+// `define DEFAULT_HSYNC       8'd2
+// `define DEFAULT_HBP         8'd2
+// `define DEFAULT_HACT        12'd468
+
 `define DEFAULT_VFP         8'd10
 `define DEFAULT_VSYNC       8'd1
 `define DEFAULT_VBP         8'd2
-`define DEFAULT_VACT        12'd1034
+`define DEFAULT_VACT        12'd1200
 `define DEFAULT_HFP         8'd16
 `define DEFAULT_HSYNC       8'd2
 `define DEFAULT_HBP         8'd2
-`define DEFAULT_HACT        12'd600
+`define DEFAULT_HACT        12'd400
 
-// `define DEFAULT_VFP         8'd10
+// `define DEFAULT_VFP         8'd33
+// `define DEFAULT_VSYNC       8'd1
+// `define DEFAULT_VBP         8'd2
+// `define DEFAULT_VACT        12'd1072
+// `define DEFAULT_HFP         8'd90
+// `define DEFAULT_HSYNC       8'd20
+// `define DEFAULT_HBP         8'd10
+// `define DEFAULT_HACT        12'd362
+
+// 1600x1200 DMT
+// `define DEFAULT_VFP         8'd45
 // `define DEFAULT_VSYNC       8'd1
 // `define DEFAULT_VBP         8'd2
 // `define DEFAULT_VACT        12'd1200
-// `define DEFAULT_HFP         8'd16
-// `define DEFAULT_HSYNC       8'd2
-// `define DEFAULT_HBP         8'd2
+// `define DEFAULT_HFP         8'd120
+// `define DEFAULT_HSYNC       8'd10
+// `define DEFAULT_HBP         8'd10
 // `define DEFAULT_HACT        12'd400
+
+//`define DEFAULT_VFP         8'd24
+//`define DEFAULT_VSYNC       8'd1
+//`define DEFAULT_VBP         8'd3
+//`define DEFAULT_VACT        12'd832
+//`define DEFAULT_HFP         8'd12
+//`define DEFAULT_HSYNC       8'd20
+//`define DEFAULT_HBP         8'd60
+//`define DEFAULT_HACT        12'd300
+
 //`define DEFAULT_VFP         8'd12
 //`define DEFAULT_VSYNC       8'd1
 //`define DEFAULT_VBP         8'd2
@@ -99,6 +156,16 @@
 //`define DEFAULT_HSYNC       8'd2
 //`define DEFAULT_HBP         8'd2
 //`define DEFAULT_HACT        12'd256
+//
+//`define DEFAULT_VFP         8'd23
+//`define DEFAULT_VSYNC       8'd1
+//`define DEFAULT_VBP         8'd1
+//`define DEFAULT_VACT        12'd600
+//`define DEFAULT_HFP         8'd60
+//`define DEFAULT_HSYNC       8'd2
+//`define DEFAULT_HBP         8'd2
+//`define DEFAULT_HACT        12'd200
+
 `define DEFAULT_FBYTES      `DEFAULT_HACT * 4 * `DEFAULT_VACT * 2
 `define DEFAULT_MINDRV        2'd2
 
@@ -113,3 +180,4 @@
 `define INIT_FAST_GREY      {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'd0, 2'b11}
 
 `define DEFAULT_MODE        `INIT_FAST_MONO_BD
+`define INPUT_LVDS 
