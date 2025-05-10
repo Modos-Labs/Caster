@@ -53,6 +53,7 @@ module csr(
     output reg [11:0] csr_cfg_hact,
     output reg [23:0] csr_cfg_fbytes,
     output reg [1:0] csr_cfg_mindrv,
+    output reg csr_mirror_en,
     // Status input
     input wire sys_ready,
     input wire mig_error,
@@ -235,6 +236,7 @@ module csr(
                     csr_osd_wr <= spi_req_wdata;
                     csr_osd_we <= 1'b1;
                 end
+                `CSR_CFG_MIRROR: csr_mirror_en <= spi_req_wdata[0];
                 default: begin
                     // no op
                 end

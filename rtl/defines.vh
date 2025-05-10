@@ -45,6 +45,7 @@
 `define CSR_OSD_ADDR_HI     8'd40
 `define CSR_OSD_ADDR_LO     8'd41
 `define CSR_OSD_WR          8'd42
+`define CSR_CFG_MIRROR      8'd43
 `define CSR_STATUS          8'd128
 `define CSR_ID0             8'd129
 

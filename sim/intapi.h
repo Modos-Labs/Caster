@@ -65,6 +65,7 @@
 #define CSR_OSD_ADDR_HI     40
 #define CSR_OSD_ADDR_LO     41
 #define CSR_OSD_WR          42
+#define CSR_CFG_MIRROR      43
 #define CSR_STATUS          128
 // Alias for 16bit registers
 #define CSR_LUT_ADDR        CSR_LUT_ADDR_HI

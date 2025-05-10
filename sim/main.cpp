@@ -82,6 +82,7 @@ void testmain(void) {
             spi_write_reg8(CSR_OSD_WR, 0x55);
         }
         spi_write_reg8(CSR_OSD_EN, 1);
+        spi_write_reg8(CSR_CFG_MIRROR, 1);
 
         spi_write_reg8(CSR_ENABLE, 1); // Enable refresh
         // Read back status

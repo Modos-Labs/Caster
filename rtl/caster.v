@@ -118,6 +118,7 @@ module caster(
     wire [7:0] hsync;
     wire [7:0] hbp;
     wire [11:0] hact;
+    wire mirror_en;
     csr csr (
         .clk(clk),
         .rst(rst),
@@ -156,6 +157,7 @@ module caster(
         .csr_cfg_hact(hact),
         .csr_cfg_fbytes(frame_bytes),
         .csr_cfg_mindrv(csr_mindrv),
+        .csr_mirror_en(mirror_en),
         // Status input
         .sys_ready(sys_ready),
         .mig_error(mig_error),
@@ -444,10 +446,6 @@ module caster(
         {8{s2_osd_overlay[2]}}, {8{s2_osd_overlay[1]}}, {8{s2_osd_overlay[0]}}};
     wire [31:0] s2_vin_overlayed = s2_osd_valid ? s2_osd_overlay_y8 : vin_pixel;
 
-    // Slice Y8 version downto Y4
-    wire [15:0] s2_vin_overlayed_y4 = {s2_vin_overlayed[31:28],
-        s2_vin_overlayed[23:20], s2_vin_overlayed[15:12], s2_vin_overlayed[7:4]};
-
     // Image dithering
     // All these processing has 1 cycle delay
     wire [3:0] s3_pixel_bayer_dithered;
@@ -510,12 +508,37 @@ module caster(
     end
     endgenerate
 
+    // Insert mirroring here
+    wire [31:0] s2_vin_mirrored;
+    wire [31:0] s2_vin_selected;
+
+    line_reverse #(
+        .BUFDEPTH(10), // 1024-depth
+        .PIXWIDTH(32) // 4-pixel wide
+    ) line_reverse (
+        .clk(clk),
+        .rst(vin_vsync),
+        .width(hact[9:0]),
+        .pix_in(s2_vin_overlayed),
+        .pix_in_en(s2_active),
+        // Delayed by exactly 1 line
+        .pix_out_ready(s2_active),
+        .pix_out(s2_vin_mirrored),
+        .pix_out_valid()
+    );
+
+    assign s2_vin_selected = mirror_en ? s2_vin_mirrored : s2_vin_overlayed;
+
+    // Slice Y8 version downto Y4
+    wire [15:0] s2_vin_selected_y4 = {s2_vin_selected[31:28],
+        s2_vin_selected[23:20], s2_vin_selected[15:12], s2_vin_selected[7:4]};
+
     // Degamma
     wire [31:0] s2_pixel_linear;
     generate
         for (i = 0; i < 4; i = i + 1) begin: gen_degamma
             degamma degamma (
-                .in(s2_vin_overlayed[i*8+2 +: 6]),
+                .in(s2_vin_selected[i*8+2 +: 6]),
                 .out(s2_pixel_linear[i*8 +: 8])
             );
         end
@@ -561,7 +584,7 @@ module caster(
     reg [15:0] s3_vin_pixel;
     reg [3:0] s3_op_valid;
     always @(posedge clk) begin
-        s3_vin_pixel <= s2_vin_overlayed_y4;
+        s3_vin_pixel <= s2_vin_selected_y4;
         s3_bi_pixel <= bi_pixel;
         s3_op_valid <= s2_op_valid;
     end
