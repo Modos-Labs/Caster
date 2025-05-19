@@ -44,8 +44,10 @@ module pixel_processing(
     localparam MODE_AUTO_LUT_NO_DITHER = 4'd12; // 1100
     localparam MODE_AUTO_LUT_BLUE_NOISE = 4'd13; // 1101
 
-    localparam FASTM_B2W_FRAMES = 6'd9;
-    localparam FASTM_W2B_FRAMES = 6'd9;
+    localparam FASTM_B2W_FRAMES = 6'd4;
+    localparam FASTM_W2B_FRAMES = 6'd4;
+//    localparam FASTM_B2W_FRAMES = 6'd9;
+//    localparam FASTM_W2B_FRAMES = 6'd9;
     //localparam FASTM_B2W_FRAMES = 6'd10;
     //localparam FASTM_W2B_FRAMES = 6'd10;
 
@@ -229,8 +231,8 @@ module pixel_processing(
 
     wire [3:0] clear_color =
         (pixel_basemode == BASEMODE_MANUAL_LUT) ? 4'hF :
-        ((op_framecnt[3:2] == 2'b11) ? 4'h0 :
-        (op_framecnt[4] ? 4'h0 : 4'hF));
+        ((op_framecnt[2:1] == 2'b11) ? 4'h0 :
+        (op_framecnt[3] ? 4'h0 : 4'hF));
 
     /* verilator lint_off UNUSEDSIGNAL */
     // Only 4 MSBs used

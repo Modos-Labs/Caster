@@ -81,7 +81,7 @@ module caster(
     localparam SCAN_RUNNING = 2'd2;
 
     /* verilator lint_off WIDTH */
-    localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 127 : 2;
+    localparam OP_INIT_LENGTH = (SIMULATION == "FALSE") ? 63 : 2;
     /* verilator lint_on WIDTH */
 
     // Internal design specific
@@ -815,7 +815,15 @@ module caster(
 
     assign dbg_scan_state = scan_state;
     assign dbg_scan_h_cnt = scan_h_cnt;
-    assign dbg_scan_v_cnt = scan_v_cnt;
+    //assign dbg_scan_v_cnt = scan_v_cnt;
+    assign dbg_scan_v_cnt[0] = op_pending;
+    assign dbg_scan_v_cnt[1] = op_valid;
+    assign dbg_scan_v_cnt[2] = vsync_trigger;
+    assign dbg_scan_v_cnt[3] = b_trigger;
+    assign dbg_scan_v_cnt[4] = osd_en;
+    assign dbg_scan_v_cnt[5] = csr_osd_en;
+    assign dbg_scan_v_cnt[7:6] = scan_state;
+    assign dbg_scan_v_cnt[10:8] = 'd0;
 
 endmodule
 `default_nettype wire
