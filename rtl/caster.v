@@ -456,7 +456,8 @@ module caster(
     wire [2:0] by_x_pos;
     wire [3:0] bn_x_pos;
     wire [1:0] bn_x_pos_sel;
-    wire [2:0] y_pos;
+    wire [2:0] by_y_pos;
+    wire [5:0] bn_y_pos;
 
     generate
     if (COLORMODE == "DES") begin: gen_des_counter
@@ -498,13 +499,20 @@ module caster(
         assign bn_x_pos_sel =
             (h_cnt_bn_add == 3'd4) ? 2'd1 :
             (h_cnt_bn_add == 3'd3) ? 2'd0 : h_cnt_bn_add[1:0];
-        assign y_pos = v_cnt_mod_3;
+        assign by_y_pos = v_cnt_mod_3;
     end
     else if ((COLORMODE == "MONO") || (COLORMODE == "RGBW")) begin: gen_mono_counter
         assign by_x_pos = scan_h_cnt[2:0];
         assign bn_x_pos = scan_h_cnt[3:0];
         assign bn_x_pos_sel = 2'b0;
-        assign y_pos = scan_v_cnt[2:0];
+        assign by_y_pos = scan_v_cnt[2:0];
+    end
+    
+    if ((COLORMODE == "DES") || (COLORMODE == "MONO")) begin: gen_mono_ypos
+        assign bn_y_pos = scan_v_cnt[5:0];
+    end
+    else if (COLORMODE == "RGBW") begin: gen_rgbw_ypos
+        assign bn_y_pos = scan_v_cnt[6:1];
     end
     endgenerate
 
@@ -543,6 +551,7 @@ module caster(
             );
         end
     endgenerate
+    //assign s2_pixel_linear = s2_vin_overlayed;
 
     // Output dithered pixel 1 clock later
     blue_noise_dithering #(
@@ -554,7 +563,7 @@ module caster(
         .vout(s3_pixel_bn1b_dithered),
         .x_pos(bn_x_pos),
         .x_pos_sel(bn_x_pos_sel),
-        .y_pos(scan_v_cnt[5:0])
+        .y_pos(bn_y_pos)
     );
 
     blue_noise_dithering #(
@@ -566,7 +575,7 @@ module caster(
         .vout(s3_pixel_bn4b_dithered),
         .x_pos(bn_x_pos),
         .x_pos_sel(bn_x_pos_sel),
-        .y_pos(scan_v_cnt[5:0])
+        .y_pos(bn_y_pos)
     );
 
     bayer_dithering #(
@@ -576,7 +585,7 @@ module caster(
         .vin(s2_pixel_linear),
         .vout(s3_pixel_bayer_dithered),
         .x_pos(by_x_pos),
-        .y_pos(y_pos)
+        .y_pos(by_y_pos)
     );
 
     // Move to next stage

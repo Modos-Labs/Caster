@@ -43,7 +43,7 @@ module blue_noise_dithering #(
     reg [1:0] addr_lo_3;
     
     generate
-    if (COLORMODE == "DES") begin: gen_des_addr_lo
+/*    if (COLORMODE == "DES") begin: gen_des_addr_lo
         always @(*) begin
             if (x_pos_sel == 2'd0) begin
                 addr_lo_0 = 2'd0;
@@ -65,12 +65,21 @@ module blue_noise_dithering #(
             end
         end
     end
-    else begin: gen_mono_addr_lo
+    else */
+    if (COLORMODE == "RGBW") begin: gen_rgbw_addr_lo
         always @(*) begin
             addr_lo_0 = 2'd0;
             addr_lo_1 = 2'd0;
             addr_lo_2 = 2'd1;
             addr_lo_3 = 2'd1;
+        end
+    end
+    else begin: gen_mono_addr_lo
+        always @(*) begin
+            addr_lo_0 = 2'd0;
+            addr_lo_1 = 2'd1;
+            addr_lo_2 = 2'd2;
+            addr_lo_3 = 2'd3;
         end
     end
     endgenerate
@@ -83,12 +92,12 @@ module blue_noise_dithering #(
     ) bramdp0 (
         .clka(clk),
         .wea(1'b0),
-        .addra({addr_hi, 2'd0}),
+        .addra({addr_hi, addr_lo_0}),
         .dina(8'b0),
         .douta(b0),
         .clkb(clk),
         .web(1'b0),
-        .addrb({addr_hi, 2'd1}),
+        .addrb({addr_hi, addr_lo_1}),
         .dinb(8'b0),
         .doutb(b1)
     );
@@ -101,12 +110,12 @@ module blue_noise_dithering #(
     ) bramdp1 (
         .clka(clk),
         .wea(1'b0),
-        .addra({addr_hi, 2'd2}),
+        .addra({addr_hi, addr_lo_2}),
         .dina(8'b0),
         .douta(b2),
         .clkb(clk),
         .web(1'b0),
-        .addrb({addr_hi, 2'd3}),
+        .addrb({addr_hi, addr_lo_3}),
         .dinb(8'b0),
         .doutb(b3)
     );
