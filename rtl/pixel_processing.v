@@ -44,10 +44,10 @@ module pixel_processing(
     localparam MODE_AUTO_LUT_NO_DITHER = 4'd12; // 1100
     localparam MODE_AUTO_LUT_BLUE_NOISE = 4'd13; // 1101
 
-    localparam FASTM_B2W_FRAMES = 6'd4;
-    localparam FASTM_W2B_FRAMES = 6'd4;
-//    localparam FASTM_B2W_FRAMES = 6'd9;
-//    localparam FASTM_W2B_FRAMES = 6'd9;
+    //localparam FASTM_B2W_FRAMES = 6'd4;
+    //localparam FASTM_W2B_FRAMES = 6'd4;
+    localparam FASTM_B2W_FRAMES = 6'd9;
+    localparam FASTM_W2B_FRAMES = 6'd9;
     //localparam FASTM_B2W_FRAMES = 6'd10;
     //localparam FASTM_W2B_FRAMES = 6'd10;
 
