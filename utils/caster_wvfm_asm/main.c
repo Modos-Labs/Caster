@@ -37,6 +37,9 @@
 
 #define MAX_MODES (32) // Maximum waveform modes supported
 #define MAX_TEMPS (32) // Maximum temperature ranges supported
+#define MAX_TABLES (MAX_MODES * MAX_TEMPS)
+
+#define MAX_FRAMES  (64) // default 64
 
 #define MAX_CSV_LINE (1024)
 
@@ -47,10 +50,15 @@ typedef struct {
     char *prefix;
     int modes;
     char **mode_names;
-    int *frame_counts; // frame_counts[mode * temps + temp]
     int temps;
     int *temp_ranges;
-    uint8_t ***luts; // luts[mode][temp][frame count * 256 + dst * 16 + src]
+    int tables;
+    int *table_ids; // table_ids[mode][temp]
+    int *frame_counts; // frame_counts[tables]
+    int inbpp;
+    int unidir;
+    int outbpp;
+    uint8_t **luts; // luts[table][frame count * 256 + dst * 16 + src]
 } context_t;
 
 static int ini_parser_handler(void* user, const char* section, const char* name,
@@ -59,7 +67,7 @@ static int ini_parser_handler(void* user, const char* section, const char* name,
 
     if (strcmp(section, "WAVEFORM") == 0) {
         if (strcmp(name, "VERSION") == 0) {
-            assert(strcmp(value, "1.0") == 0);
+            assert((strcmp(value, "2.0") == 0) || (strcmp(value, "2.1") == 0));
         }
         else if (strcmp(name, "PREFIX") == 0) {
             pcontext->prefix = strdup(value);
@@ -77,9 +85,25 @@ static int ini_parser_handler(void* user, const char* section, const char* name,
             assert(pcontext->temps <= MAX_TEMPS);
             pcontext->temp_ranges = malloc(sizeof(int) * pcontext->temps);
             assert(pcontext->temp_ranges);
-            pcontext->frame_counts = malloc(sizeof(int) * pcontext->modes *
+        }
+        else if (strcmp(name, "TABLES") == 0) {
+            // Allocate memory for tables
+            pcontext->tables = atoi(value);
+            assert(pcontext->tables <= MAX_TABLES);
+            pcontext->table_ids = malloc(sizeof(int) * pcontext->modes *
                     pcontext->temps);
+            assert(pcontext->table_ids);
+            pcontext->frame_counts = malloc(sizeof(int) * pcontext->tables);
             assert(pcontext->frame_counts);
+        }
+        else if (strcmp(name, "BPP") == 0) {
+            pcontext->inbpp = atoi(value);
+        }
+        else if (strcmp(name, "OUTBPP") == 0) {
+            pcontext->outbpp = atoi(value);
+        }
+        else if (strcmp(name, "UNIDIR") == 0) {
+            pcontext->unidir = atoi(value);
         }
         else {
             size_t len = strlen(name);
@@ -91,6 +115,15 @@ static int ini_parser_handler(void* user, const char* section, const char* name,
                 int temp_id = atoi(temp_id_s + 1);
                 free(temp_id_s);
                 pcontext->temp_ranges[temp_id] = atoi(value);
+            }
+            else if ((len >= 5) && (strncmp(name, "TB", 2) == 0) &&
+                    (strncmp(name + (len - 2), "FC", 2) == 0)) {
+                // Frame count
+                char *table_id_s = strdup(name);
+                table_id_s[len - 2] = '\0';
+                int table_id = atoi(table_id_s + 2);
+                free(table_id_s);
+                pcontext->frame_counts[table_id] = atoi(value);
             }
             else {
                 fprintf(stderr, "Unknown name %s=%s\n", name, value);
@@ -107,15 +140,14 @@ static int ini_parser_handler(void* user, const char* section, const char* name,
             // Mode Name
             pcontext->mode_names[mode_id] = strdup(value);
         }
-        else if ((len >= 4) && (name[0] == 'T') &&
-                (strncmp(name + (len - 2), "FC", 2) == 0)) {
+        else if ((len >= 7) && (name[0] == 'T') &&
+                (strncmp(name + (len - 5), "TABLE", 2) == 0)) {
             // Frame Count
-            char *temp_id_s = strdup(name);
-            temp_id_s[len - 2] = '\0';
-            int temp_id = atoi(temp_id_s + 1);
-            free(temp_id_s);
-            pcontext->frame_counts[pcontext->temps * mode_id + temp_id]
-                    = atoi(value);
+            char *table_id_s = strdup(name);
+            table_id_s[len - 2] = '\0';
+            int table_id = atoi(table_id_s + 1);
+            free(table_id_s);
+            pcontext->table_ids[table_id] = atoi(value);
         }
     }
     else {
@@ -154,12 +186,11 @@ static void parse_range(const char* str, int* begin, int* end) {
 }
 
 static void load_waveform_csv(const char* filename, int frame_count,
-        uint8_t* lut) {
+        uint8_t* lut, int inbpp, int unidir) {
     FILE* fp = fopen(filename, "r");
     assert(fp);
 
-    // Unspecified parts of LUT will be filled with 3 instead of 0 for debugging
-    memset(lut, 3, frame_count * 256);
+    memset(lut, 0, frame_count * 256);
 
     char* line;
     int done = 0;
@@ -175,19 +206,33 @@ static void load_waveform_csv(const char* filename, int frame_count,
         int src0, src1, dst0, dst1;
         // Skip empty lines
         if (!parsed[0]) continue;
-        if (!parsed[1]) continue;
         parse_range(parsed[0], &src0, &src1);
-        parse_range(parsed[1], &dst0, &dst1);
         // Fill in LUT
-        for (int i = 0; i < frame_count; i++) {
-            assert(parsed[i]);
-            uint8_t val = atoi(parsed[i + 2]);
-            for (int src = src0; src <= src1; src++) {
-                for (int dst = dst0; dst <= dst1; dst++) {
-                    lut[i * 256 + dst * 16 + src] = val;
+        if (unidir) {
+            // 1D LUT
+            for (int i = 0; i < frame_count; i++) {
+                assert(parsed[i]);
+                uint8_t val = atoi(parsed[i + 1]);
+                for (int src = src0; src <= src1; src++) {
+                    lut[i * 16 + src] = val;
                 }
             }
         }
+        else {
+            // 2D LUT
+            if (!parsed[1]) continue;
+            parse_range(parsed[1], &dst0, &dst1);
+            for (int i = 0; i < frame_count; i++) {
+                assert(parsed[i]);
+                uint8_t val = atoi(parsed[i + 2]);
+                for (int src = src0; src <= src1; src++) {
+                    for (int dst = dst0; dst <= dst1; dst++) {
+                        lut[i * 256 + dst * 16 + src] = val;
+                    }
+                }
+            }
+        }
+
         free_csv_line(parsed);
         free(line);
     }
@@ -221,6 +266,16 @@ static void copy_lut(uint8_t* dst, uint8_t* src, size_t src_count) {
     }
 }
 
+static void copy_lut_4bpp(uint8_t* dst, uint8_t* src, size_t src_count) {
+    for (size_t i = 0; i < src_count / 2; i++) {
+        uint8_t val;
+        val = *src++;
+        val <<= 4;
+        val |= *src++;
+        *dst++ = val;
+    }
+}
+
 int main(int argc, char *argv[]) {
     context_t context;
     
@@ -235,6 +290,12 @@ int main(int argc, char *argv[]) {
 
     char* input_fn = argv[1];
     char* output_path = argv[2];
+
+    memset(&context, 0, sizeof(context));
+    // Set default values for backwards compatibility
+    context.unidir = 0;
+    context.inbpp = 4;
+    context.outbpp = 2;
 
     if (ini_parse(input_fn, ini_parser_handler, &context) < 0) {
         fprintf(stderr, "Failed to load waveform descriptor.\n");
@@ -263,60 +324,80 @@ int main(int argc, char *argv[]) {
         printf("Temp %d: %d degC\n", i, context.temp_ranges[i]);
     }
 
-    assert(context.modes < 100);
-    assert(context.temps < 100);
+    assert(context.modes < MAX_MODES);
+    assert(context.temps < MAX_TEMPS);
+
+    if (context.inbpp != 4) {
+        printf("5bpp waveform not supported. Use 5bpp to 4bpp tool to convert it first\n");
+        exit(1);
+    }
 
     // Load actual waveform
+    uint32_t frame_size = context.unidir ? 16 : 256;
     char *dir = dirname(input_fn); // Return val of dirname shall not be free()d
     size_t dirlen = strlen(dir);
-    context.luts = malloc(context.modes * sizeof(uint8_t**));
+    context.luts = malloc(context.tables * sizeof(uint8_t*));
     char* fn = malloc(dirlen + strlen(context.prefix) + 14);
     assert(fn);
     assert(context.luts);
-    for (int i = 0; i < context.modes; i++) {
-        context.luts[i] = malloc(context.temps * sizeof(uint8_t*));
+    for (int i = 0; i < context.tables; i++) {
+        int frame_count = context.frame_counts[i];
+        context.luts[i] = malloc(frame_count * frame_size); // LUT always in 8b
         assert(context.luts[i]);
-        for (int j = 0; j < context.temps; j++) {
-            int frame_count = context.frame_counts[i * context.temps + j];
-            context.luts[i][j] = malloc(frame_count * 256); // LUT always in 8b
-            assert(context.luts[i][j]);
-            sprintf(fn, "%s/%s_M%d_T%d.csv", dir, context.prefix, i, j);
-            printf("Loading %s...\n", fn);
-            load_waveform_csv(fn, frame_count, context.luts[i][j]);
-            
-        }
+        sprintf(fn, "%s/%s_TB%d.csv", dir, context.prefix, i);
+        printf("Loading %s...\n", fn);
+        load_waveform_csv(fn, frame_count, context.luts[i], context.inbpp,
+                context.unidir);
     }
     free(fn);
 
 
     // Fill waveform data
-    uint8_t* wvfm = malloc(4*1024); // each table is always 4KB
+    size_t binsize = MAX_FRAMES * 16 * 16 * context.outbpp / 8;
+    uint8_t* wvfm = malloc(binsize);
     fn = malloc(strlen(output_path) + strlen(context.prefix) + 14);
-    for (int i = 0; i < context.modes; i++) {
-        for (int j = 0; j < context.temps; j++) {
-            size_t index = i * context.temps + j;
-            int frame_count = context.frame_counts[index];
-            if (frame_count > 64)
-                continue;
-            memset(wvfm, 0, 4*1024);
-            copy_lut(wvfm, context.luts[i][j], frame_count * 256);
-            // Write out binary version
-            sprintf(fn, "%s/%s_M%d_T%d.bin", output_path, context.prefix, i, j);
-            FILE *outFile = fopen(fn, "wb");
-            assert(outFile);
-            size_t written = fwrite(wvfm, 4*1024, 1, outFile);
-            assert(written == 1);
-            fclose(outFile);
-            // Write out text version
-            sprintf(fn, "%s/%s_M%d_T%d.mem", output_path, context.prefix, i, j);
-            outFile = fopen(fn, "w");
-            assert(outFile);
-            uint8_t *prd = wvfm;
-            for (int f = 0; f < 4 * 1024; f++) {
-                fprintf(outFile, "%02x\n", *prd++);
-            }
-            fclose(outFile);
+    int max_frames = MAX_FRAMES * (context.unidir ? 16 : 1); 
+    for (int i = 0; i < context.tables; i++) {
+        int frame_count = context.frame_counts[i];
+        if (frame_count > max_frames) {
+            printf("Table %d too long to fit, skipping...\n", i);
+            continue;
         }
+        memset(wvfm, 0, binsize);
+        if (context.outbpp == 2)
+            copy_lut(wvfm, context.luts[i], frame_count * frame_size);
+        else
+            copy_lut_4bpp(wvfm, context.luts[i], frame_count * frame_size);
+        // Write out binary version
+        sprintf(fn, "%s/%s_TB%d.bin", output_path, context.prefix, i);
+        FILE *outFile = fopen(fn, "wb");
+        assert(outFile);
+        size_t written = fwrite(wvfm, binsize, 1, outFile);
+        assert(written == 1);
+        fclose(outFile);
+        // Write out text version
+        sprintf(fn, "%s/%s_TB%d.mem", output_path, context.prefix, i);
+        outFile = fopen(fn, "w");
+        assert(outFile);
+        uint8_t *prd = wvfm;
+        for (int f = 0; f < binsize; f++) {
+            fprintf(outFile, "%02x\n", *prd++);
+        }
+        fclose(outFile);
+        sprintf(fn, "%s/%s_TB%d.h", output_path, context.prefix, i);
+        outFile = fopen(fn, "w");
+        assert(outFile);
+        fprintf(outFile, "const unsigned char %s_TB%d[%zu] = {\n", context.prefix, i, binsize);
+        prd = wvfm;
+        for (int i = 0; i < binsize / 8; i++) {
+            fprintf(outFile, "   ");
+            for (int j = 0; j < 8; j++) {
+                fprintf(outFile, " 0x%02x,", *prd++);
+            }
+            fprintf(outFile, "\n");
+        }
+        fprintf(outFile, "};");
+        fclose(outFile);
     }
     free(fn);
 
@@ -326,9 +407,8 @@ int main(int argc, char *argv[]) {
     free(context.prefix);
     for (int i = 0; i < context.modes; i++) {
         free(context.mode_names[i]);
-        for (int j = 0; j < context.temps; j++) {
-            free(context.luts[i][j]);
-        }
+    }
+    for (int i = 0; i < context.tables; i++) {
         free(context.luts[i]);
     }
     free(context.mode_names);
