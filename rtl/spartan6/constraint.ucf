@@ -16,6 +16,13 @@ TIMESPEC TS_LVDS_CLK = PERIOD "LVDS_CLK" 81 MHz HIGH 50%;
 NET "DPI_PCLK" TNM_NET = DPI_CLK;
 TIMESPEC TS_DPI_CLK = PERIOD "DPI_CLK" 162 MHz HIGH 50%;
 
+# Force ISE to evaluate paths clocked by the (originally) logic-generated pixel
+# clock (BUFGMUX I0 comes from vin_dpi)
+PIN "vin/iclk_mux.I0" TNM_NET = "V_PCLK_LOGIC";
+# "TS_DPI_CLK / 2" seems to be correct because it halves the frequency
+TIMESPEC TS_V_PCLK_LOGIC = PERIOD "V_PCLK_LOGIC" TS_DPI_CLK / 2.0;
+
+
 NET "clk_epdc" TNM_NET = PCLK;
 TIMESPEC TS_PCLK = PERIOD "PCLK" 41 MHz HIGH 50%;
 
