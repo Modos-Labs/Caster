@@ -1,5 +1,10 @@
 #!/bin/bash
-source /opt/Xilinx/14.7/ISE_DS/settings64.sh
+
+set -e
+
+if [ -z "${XILINX:-}" ]; then
+    source /opt/Xilinx/14.7/ISE_DS/settings64.sh
+fi
 source clean.sh
 
 mkdir -p "../synth/__projnav" > ise_flow_results.txt

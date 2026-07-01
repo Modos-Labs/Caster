@@ -69,6 +69,9 @@ sim/sim
 *.sch-bak
 *.kicad_pcb-bak
 
+# Building temp files
+/rtl/spartan6/par/ise_flow_results.txt
+
 # Test
 *.vcd
 *.actual

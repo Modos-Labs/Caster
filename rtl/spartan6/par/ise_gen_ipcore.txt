@@ -1,0 +1,4 @@
+project open ../caster.xise
+process run "Regenerate All Cores"
+process run "Generate Programming File"
+exit
