@@ -65,6 +65,7 @@ module csr(
     input wire mif_error,
     input wire op_busy,
     input wire op_queue,
+    input wire [20:0] csr_damage_counter,
     // Debug
     output wire dbg_spi_req_wen,
     output wire [7:0] dbg_spi_req_addr,
@@ -153,6 +154,9 @@ module csr(
         (spi_req_addr == `CSR_STATUS) ?
             {mig_error, mif_error, sys_ready, op_busy, op_queue, 2'd0, csr_en} :
         (spi_req_addr == `CSR_ID0) ? 8'h35 :
+        (spi_req_addr == `CSR_DAMAGE_COUNT_HI) ? {3'd0, csr_damage_counter[20:16]} :
+        (spi_req_addr == `CSR_DAMAGE_COUNT_MID) ? csr_damage_counter[15:8] :
+        (spi_req_addr == `CSR_DAMAGE_COUNT_LO) ? csr_damage_counter[7:0] :
         8'd0;
 
     always @(posedge clk or posedge rst) begin

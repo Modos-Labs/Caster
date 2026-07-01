@@ -53,6 +53,9 @@
 `define CSR_CFG_FASTG_W2GFRAME 8'd47
 `define CSR_STATUS          8'd128
 `define CSR_ID0             8'd129
+`define CSR_DAMAGE_COUNT_HI 8'd130
+`define CSR_DAMAGE_COUNT_MID 8'd131
+`define CSR_DAMAGE_COUNT_LO 8'd132
 
 // FB operations
 // Redraw:

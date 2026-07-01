@@ -36,6 +36,7 @@ module pixel_processing(
     input  wire [5:0]  al_framecnt, // Auto LUT mode frame counter
     input  wire        autolut_start,// Global Auto LUT greyscale release
     input  wire        framecap_en, // Pixel updates allowed this frame
+    output reg         pixel_diff,  // Screen-driving pixel change started
     output reg         pixel_activity,// Pixel state changed or coalesced
     output reg         autolut_pending// Pixel is waiting for Auto LUT release
 );
@@ -263,6 +264,7 @@ module pixel_processing(
     always @(*) begin
         proc_output = `NO_DRIVE;
         proc_bo = proc_bi;
+        pixel_diff = 1'b0;
         pixel_activity = 1'b0;
         autolut_pending = 1'b0;
         // Normal mode, init mode override later
@@ -292,6 +294,7 @@ module pixel_processing(
                         proc_bo = proc_vinnd_msb ? (
                             {proc_bi[15:12], STAGE_MONO, csr_b2wframe, csr_mindrv, 2'd1}
                         ) : {proc_bi[15:12], STAGE_MONO, csr_w2bframe, csr_mindrv, 2'd0};
+                        pixel_diff = 1'b1;
                         pixel_activity = 1'b1;
                     end
                     else begin
@@ -304,6 +307,7 @@ module pixel_processing(
                     proc_bo = proc_vinnd_msb ? (
                         {proc_bi[15:10], pixel_framecnt_2w, csr_mindrv, 2'd1}
                     ) : {proc_bi[15:10], pixel_framecnt_2b, csr_mindrv, 2'd0};
+                    pixel_diff = 1'b1;
                     pixel_activity = 1'b1;
                 end
                 else begin
@@ -331,6 +335,7 @@ module pixel_processing(
                         proc_bo = proc_vinnd_msb ? (
                             {proc_bi[15:12], STAGE_MONO, csr_b2wframe, csr_mindrv, 2'd1}
                         ) : {proc_bi[15:12], STAGE_MONO, csr_w2bframe, csr_mindrv, 2'd0};
+                        pixel_diff = 1'b1;
                         pixel_activity = 1'b1;
                     end
                     else if ((proc_vin != pixel_prev) && framecap_en) begin
@@ -362,6 +367,7 @@ module pixel_processing(
                             proc_bo = proc_vinnd_msb ? (
                                 {proc_bi[15:12], STAGE_MONO, fastg_g2w_frames, csr_mindrv, 2'd1}
                             ) : {proc_bi[15:12], STAGE_MONO, fastg_g2b_frames, csr_mindrv, 2'd0};
+                            pixel_diff = 1'b1;
                         end
                     end
                     else begin
@@ -385,6 +391,7 @@ module pixel_processing(
                     proc_bo = proc_vin[3] ? (
                         {proc_bi[15:10], pixel_framecnt_2w, csr_mindrv, 2'd1}
                     ) : {proc_bi[15:10], pixel_framecnt_2b, csr_mindrv, 2'd0};
+                    pixel_diff = 1'b1;
                 end
                 else begin
                     // Pixel state not changed
@@ -400,6 +407,7 @@ module pixel_processing(
                     proc_bo = proc_vin[3] ? (
                         {proc_bi[15:10], csr_b2wframe, csr_mindrv, 2'd1}
                     ) : {proc_bi[15:10], csr_w2bframe, csr_mindrv, 2'd0};
+                    pixel_diff = 1'b1;
                 end
                 else begin
                     // Pixel state not changed
@@ -418,6 +426,7 @@ module pixel_processing(
                     proc_bo = proc_vin[3] ? (
                         {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2w, csr_mindrv, proc_vin[3:2]}
                     ) : {proc_bi[15:12], STAGE_MONO, pixel_framecnt_2b, csr_mindrv, proc_vin[3:2]};
+                    pixel_diff = 1'b1;
                 end
                 else begin
                     proc_output = pixel_prev[1] ? `DRIVE_WHITE : `DRIVE_BLACK;
@@ -438,6 +447,7 @@ module pixel_processing(
                     proc_bo = proc_vin[3] ? (
                         {proc_bi[15:12], STAGE_MONO, csr_b2wframe, csr_mindrv, proc_vin[3:2]}
                     ) : {proc_bi[15:12], STAGE_MONO, csr_w2bframe, csr_mindrv, proc_vin[3:2]};
+                    pixel_diff = 1'b1;
                 end
                 else begin
                     // Pixel state not changed
@@ -487,6 +497,7 @@ module pixel_processing(
                             ) : (
                                 {proc_bi[15:12], STAGE_DONE, 6'd0, 2'b00, proc_vin[3:2]}
                             ));
+                    pixel_diff = 1'b1;
                 end
                 else begin
                     // Pixel state not changed
@@ -500,6 +511,7 @@ module pixel_processing(
         // If set mode is active, override previous
         if (set_mode_apply) begin
             proc_output = `NO_DRIVE;
+            pixel_diff = 1'b0;
             pixel_activity = 1'b0;
             autolut_pending = 1'b0;
             // Use the initial state preset

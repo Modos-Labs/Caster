@@ -71,6 +71,10 @@
 #define CSR_CFG_FASTG_B2GFRAME 46
 #define CSR_CFG_FASTG_W2GFRAME 47
 #define CSR_STATUS          128
+#define CSR_ID0             129
+#define CSR_DAMAGE_COUNT_HI 130
+#define CSR_DAMAGE_COUNT_MID 131
+#define CSR_DAMAGE_COUNT_LO 132
 // Alias for 16bit registers
 #define CSR_LUT_ADDR        CSR_LUT_ADDR_HI
 #define CSR_OP_LEFT         CSR_OP_LEFT_HI

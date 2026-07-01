@@ -175,6 +175,7 @@ module caster(
         .mif_error(mif_error),
         .op_busy(op_valid),
         .op_queue(op_pending),
+        .csr_damage_counter(damage_counter_last),
         .dbg_spi_req_wen(dbg_spi_req_wen),
         .dbg_spi_req_addr(dbg_spi_req_addr),
         .dbg_spi_req_wdata(dbg_spi_req_wdata)
@@ -302,6 +303,8 @@ module caster(
     reg autolut_frame_activity_last;
     reg autolut_frame_pending;
     reg autolut_frame_pending_last;
+    reg [20:0] damage_counter;
+    reg [20:0] damage_counter_last;
     wire framecap_en = 1'b1;
 
     always @(posedge clk) begin
@@ -739,6 +742,7 @@ module caster(
 
     wire [7:0] pixel_comb;
     wire [63:0] bo_pixel_comb;
+    wire [3:0] pixel_diff;
     wire [3:0] pixel_activity;
     wire [3:0] autolut_pending;
     generate
@@ -775,6 +779,7 @@ module caster(
                 .al_framecnt(al_framecnt),
                 .autolut_start(autolut_start),
                 .framecap_en(framecap_en),
+                .pixel_diff(pixel_diff[i]),
                 .pixel_activity(pixel_activity[i]),
                 .autolut_pending(autolut_pending[i])
             );
@@ -787,6 +792,9 @@ module caster(
 
     always @(posedge clk) begin
         if (s4_active) begin
+            if (pixel_diff != 4'd0) begin
+                damage_counter <= damage_counter + 21'd1;
+            end
             if (pixel_activity != 4'd0) begin
                 autolut_frame_activity <= 1'b1;
             end
@@ -795,12 +803,16 @@ module caster(
             end
         end
         else if (vsync_trigger) begin
+            damage_counter_last <= damage_counter;
+            damage_counter <= 21'd0;
             autolut_frame_activity_last <= autolut_frame_activity;
             autolut_frame_activity <= 1'b0;
             autolut_frame_pending_last <= autolut_frame_pending;
             autolut_frame_pending <= 1'b0;
         end
         if (rst) begin
+            damage_counter <= 21'd0;
+            damage_counter_last <= 21'd0;
             autolut_frame_activity <= 1'b0;
             autolut_frame_activity_last <= 1'b0;
             autolut_frame_pending <= 1'b0;

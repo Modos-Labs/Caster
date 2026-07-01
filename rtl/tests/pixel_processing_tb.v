@@ -38,6 +38,7 @@ module pixel_processing_tb;
     reg [5:0] al_framecnt;
     reg autolut_start;
     reg framecap_en;
+    wire pixel_diff;
     wire pixel_activity;
     wire autolut_pending;
 
@@ -64,6 +65,7 @@ module pixel_processing_tb;
         .al_framecnt(al_framecnt),
         .autolut_start(autolut_start),
         .framecap_en(framecap_en),
+        .pixel_diff(pixel_diff),
         .pixel_activity(pixel_activity),
         .autolut_pending(autolut_pending)
     );
@@ -162,12 +164,14 @@ module pixel_processing_tb;
         #1;
         expect2(pixel_out, DRIVE_WHITE, "FAST_MONO black-to-white drives white");
         expect6(proc_bo[9:4], 6'd6, "FAST_MONO uses CSR black-to-white frame count");
+        expect1(pixel_diff, 1'b1, "FAST_MONO black-to-white reports pixel diff");
 
         pix_state = {MODE_FAST_MONO_NO_DITHER, 2'b0, 6'd0, 3'd0, 1'b1};
         pixel_in = 4'd0;
         #1;
         expect2(pixel_out, DRIVE_BLACK, "FAST_MONO white-to-black drives black");
         expect6(proc_bo[9:4], 6'd7, "FAST_MONO uses CSR white-to-black frame count");
+        expect1(pixel_diff, 1'b1, "FAST_MONO white-to-black reports pixel diff");
 
         pix_state = {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'b00, 2'b11};
         pixel_in = 4'd8;
@@ -175,6 +179,7 @@ module pixel_processing_tb;
         expect2(pixel_out, DRIVE_WHITE, "FAST_GREY same-binary grey update starts binary drive");
         expect2(proc_bo[11:10], STAGE_GREY, "FAST_GREY same-binary update enters GREY");
         expect6(proc_bo[9:4], 6'd8, "FAST_GREY uses CSR white-to-grey frame count plus settle");
+        expect1(pixel_diff, 1'b1, "FAST_GREY same-binary update reports pixel diff");
 
         pix_state = {MODE_FAST_GREY, STAGE_DONE, 6'd0, 2'b00, 2'b00};
         pixel_in = 4'd4;
@@ -182,6 +187,7 @@ module pixel_processing_tb;
         expect2(pixel_out, DRIVE_BLACK, "FAST_GREY black-to-grey update starts binary drive");
         expect2(proc_bo[11:10], STAGE_GREY, "FAST_GREY black-to-grey update enters GREY");
         expect6(proc_bo[9:4], 6'd7, "FAST_GREY uses CSR black-to-grey frame count plus settle");
+        expect1(pixel_diff, 1'b1, "FAST_GREY black-to-grey reports pixel diff");
 
         pix_state = `INIT_FAST_GREY;
         pixel_in = 4'd0;
@@ -192,6 +198,7 @@ module pixel_processing_tb;
         #1;
         expect2(pixel_out, NO_DRIVE, "SETMODE apply does not leak stale pixel drive");
         expect2(proc_bo[15:14], 2'b10, "SETMODE apply updates pixel mode");
+        expect1(pixel_diff, 1'b0, "SETMODE apply suppresses pixel diff");
 
         op_valid = 1'b0;
         op_cmd = 8'd0;
@@ -209,6 +216,7 @@ module pixel_processing_tb;
         #1;
         expect2(pixel_out, DRIVE_BLACK, "settled AUTO_LUT starts mono drive");
         expect2(proc_bo[11:10], STAGE_MONO, "settled AUTO_LUT enters MONO");
+        expect1(pixel_diff, 1'b1, "mono start reports pixel diff");
         expect1(pixel_activity, 1'b1, "mono start reports activity");
         commit_pixel();
 
@@ -229,6 +237,7 @@ module pixel_processing_tb;
         pixel_in = 4'd5;
         #1;
         expect2(pixel_out, NO_DRIVE, "same-binary pending target coalesces without drive");
+        expect1(pixel_diff, 1'b0, "same-binary pending target coalesce does not report pixel diff");
         expect1(pixel_activity, 1'b1, "pending target coalesce reports activity");
         expect1(proc_bo[9], 1'b1, "coalesced target remains pending");
         expect4(proc_bo[3:0], 4'd5, "coalesced target updates target nibble");
