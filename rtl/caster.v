@@ -87,6 +87,7 @@ module caster(
     // Internal design specific
     localparam VS_DELAY = 8; // wait 8 clocks after VS is vaild
     localparam PIPELINE_DELAY = 4;
+    localparam AUTOLUT_QUIET_FRAMES = 6'd60;
 
     // Control status registers
     wire [5:0] csr_lut_frame;
@@ -102,6 +103,10 @@ module caster(
     wire [7:0] csr_osd_wr;
     wire csr_osd_we;
     wire [1:0] csr_mindrv;
+    wire [5:0] csr_b2wframe;
+    wire [5:0] csr_w2bframe;
+    wire [5:0] csr_fastg_b2gframe;
+    wire [5:0] csr_fastg_w2gframe;
     wire [11:0] csr_op_left;
     wire [11:0] csr_op_right;
     wire [11:0] csr_op_top;
@@ -158,6 +163,10 @@ module caster(
         .csr_cfg_hact(hact),
         .csr_cfg_fbytes(frame_bytes),
         .csr_cfg_mindrv(csr_mindrv),
+        .csr_cfg_b2wframe(csr_b2wframe),
+        .csr_cfg_w2bframe(csr_w2bframe),
+        .csr_cfg_fastg_b2gframe(csr_fastg_b2gframe),
+        .csr_cfg_fastg_w2gframe(csr_fastg_w2gframe),
         .csr_mirror_en(mirror_en),
         .csr_blank_input(blank_input),
         // Status input
@@ -282,8 +291,18 @@ module caster(
     reg [7:0] op_framecnt; // Framecount for operation transition
     assign op_done = op_framecnt == 0;
 
-    // Counters for auto LUT mode, free running
+    // Counters for auto LUT mode. The waveform phase starts only after the
+    // frame has been globally quiet while pixels are pending grayscale.
     reg [5:0] al_framecnt;
+    reg autolut_running;
+    reg autolut_start;
+    reg autolut_first_frame;
+    reg [5:0] autolut_quiet_counter;
+    reg autolut_frame_activity;
+    reg autolut_frame_activity_last;
+    reg autolut_frame_pending;
+    reg autolut_frame_pending_last;
+    wire framecap_en = 1'b1;
 
     always @(posedge clk) begin
         case (scan_state)
@@ -311,12 +330,35 @@ module caster(
                 else begin
                     op_framecnt <= op_framecnt - 1;
                 end
-                // Update Auto LUT state
-                if (al_framecnt == 0) begin
-                    al_framecnt <= csr_lut_frame;
+                // Update Auto LUT global quiescence barrier and waveform phase.
+                autolut_start <= 1'b0;
+                if (autolut_running) begin
+                    if (autolut_first_frame) begin
+                        autolut_first_frame <= 1'b0;
+                    end
+                    else if (al_framecnt != 0) begin
+                        al_framecnt <= al_framecnt - 1;
+                    end
+                    else begin
+                        autolut_running <= 1'b0;
+                    end
                 end
                 else begin
-                    al_framecnt <= al_framecnt - 1;
+                    al_framecnt <= 6'd0;
+                    if (autolut_frame_activity_last) begin
+                        autolut_quiet_counter <= 6'd0;
+                    end
+                    else if (autolut_quiet_counter != AUTOLUT_QUIET_FRAMES) begin
+                        autolut_quiet_counter <= autolut_quiet_counter + 6'd1;
+                    end
+                    if (autolut_frame_pending_last && !autolut_frame_activity_last &&
+                            (autolut_quiet_counter == AUTOLUT_QUIET_FRAMES)) begin
+                        autolut_start <= 1'b1;
+                        autolut_running <= 1'b1;
+                        autolut_first_frame <= 1'b1;
+                        al_framecnt <= csr_lut_frame;
+                        autolut_quiet_counter <= 6'd0;
+                    end
                 end
             end
             else begin
@@ -355,6 +397,10 @@ module caster(
             op_state <= `OP_INIT;
             op_framecnt <= OP_INIT_LENGTH;
             al_framecnt <= 0;
+            autolut_running <= 1'b0;
+            autolut_start <= 1'b0;
+            autolut_first_frame <= 1'b0;
+            autolut_quiet_counter <= 6'd0;
         end
     end
 
@@ -693,6 +739,8 @@ module caster(
 
     wire [7:0] pixel_comb;
     wire [63:0] bo_pixel_comb;
+    wire [3:0] pixel_activity;
+    wire [3:0] autolut_pending;
     generate
         for (i = 0; i < 4; i = i + 1) begin: gen_pix_proc
             wire [3:0] proc_p_or = s4_vin_pixel[i*4+:4];
@@ -707,6 +755,10 @@ module caster(
             pixel_processing pixel_processing(
                 .csr_lutframe(csr_lut_frame),
                 .csr_mindrv(csr_mindrv),
+                .csr_b2wframe(csr_b2wframe),
+                .csr_w2bframe(csr_w2bframe),
+                .csr_fastg_b2gframe(csr_fastg_b2gframe),
+                .csr_fastg_w2gframe(csr_fastg_w2gframe),
                 .proc_p_or(proc_p_or),
                 .proc_p_bd(proc_p_bd),
                 .proc_p_n1(proc_p_n1),
@@ -720,7 +772,11 @@ module caster(
                 .op_cmd(op_cmd),
                 .op_param(op_param),
                 .op_framecnt(op_framecnt),
-                .al_framecnt(al_framecnt)
+                .al_framecnt(al_framecnt),
+                .autolut_start(autolut_start),
+                .framecap_en(framecap_en),
+                .pixel_activity(pixel_activity[i]),
+                .autolut_pending(autolut_pending[i])
             );
 
             // Output
@@ -728,6 +784,29 @@ module caster(
             assign bo_pixel_comb[i*16+:16] = frame_valid ? proc_bo : proc_bi;
         end
     endgenerate
+
+    always @(posedge clk) begin
+        if (s4_active) begin
+            if (pixel_activity != 4'd0) begin
+                autolut_frame_activity <= 1'b1;
+            end
+            if (autolut_pending != 4'd0) begin
+                autolut_frame_pending <= 1'b1;
+            end
+        end
+        else if (vsync_trigger) begin
+            autolut_frame_activity_last <= autolut_frame_activity;
+            autolut_frame_activity <= 1'b0;
+            autolut_frame_pending_last <= autolut_frame_pending;
+            autolut_frame_pending <= 1'b0;
+        end
+        if (rst) begin
+            autolut_frame_activity <= 1'b0;
+            autolut_frame_activity_last <= 1'b0;
+            autolut_frame_pending <= 1'b0;
+            autolut_frame_pending_last <= 1'b0;
+        end
+    end
 
     reg [7:0] current_pixel;
     always @(posedge clk) begin

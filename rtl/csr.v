@@ -53,6 +53,10 @@ module csr(
     output reg [11:0] csr_cfg_hact,
     output reg [23:0] csr_cfg_fbytes,
     output reg [1:0] csr_cfg_mindrv,
+    output reg [5:0] csr_cfg_b2wframe,
+    output reg [5:0] csr_cfg_w2bframe,
+    output reg [5:0] csr_cfg_fastg_b2gframe,
+    output reg [5:0] csr_cfg_fastg_w2gframe,
     output reg csr_mirror_en,
     output reg csr_blank_input,
     // Status input
@@ -157,6 +161,11 @@ module csr(
             csr_lut_we <= 1'b0;
             csr_op_en <= 1'b0;
             csr_osd_en <= 1'b0;
+            csr_cfg_mindrv <= `DEFAULT_MINDRV;
+            csr_cfg_b2wframe <= `DEFAULT_B2WFRAME;
+            csr_cfg_w2bframe <= `DEFAULT_W2BFRAME;
+            csr_cfg_fastg_b2gframe <= `DEFAULT_FASTG_B2GFRAME;
+            csr_cfg_fastg_w2gframe <= `DEFAULT_FASTG_W2GFRAME;
             `ifdef CSR_SELFBOOT
             csr_en <= 1'b1;
             csr_cfg_vfp <= `DEFAULT_VFP;
@@ -168,7 +177,6 @@ module csr(
             csr_cfg_hbp <= `DEFAULT_HBP;
             csr_cfg_hact <= `DEFAULT_HACT;
             csr_cfg_fbytes <= `DEFAULT_FBYTES;
-            csr_cfg_mindrv <= `DEFAULT_MINDRV;
             `else
             csr_en <= 1'b0;
             `endif
@@ -241,6 +249,10 @@ module csr(
                     csr_osd_we <= 1'b1;
                 end
                 `CSR_CFG_MIRROR: csr_mirror_en <= spi_req_wdata[0];
+                `CSR_CFG_B2WFRAME: csr_cfg_b2wframe <= spi_req_wdata[5:0];
+                `CSR_CFG_W2BFRAME: csr_cfg_w2bframe <= spi_req_wdata[5:0];
+                `CSR_CFG_FASTG_B2GFRAME: csr_cfg_fastg_b2gframe <= spi_req_wdata[5:0];
+                `CSR_CFG_FASTG_W2GFRAME: csr_cfg_fastg_w2gframe <= spi_req_wdata[5:0];
                 default: begin
                     // no op
                 end

@@ -47,6 +47,10 @@
 `define CSR_OSD_ADDR_LO     8'd41
 `define CSR_OSD_WR          8'd42
 `define CSR_CFG_MIRROR      8'd43
+`define CSR_CFG_B2WFRAME    8'd44
+`define CSR_CFG_W2BFRAME    8'd45
+`define CSR_CFG_FASTG_B2GFRAME 8'd46
+`define CSR_CFG_FASTG_W2GFRAME 8'd47
 `define CSR_STATUS          8'd128
 `define CSR_ID0             8'd129
 
@@ -168,6 +172,10 @@
 
 `define DEFAULT_FBYTES      `DEFAULT_HACT * 4 * `DEFAULT_VACT * 2
 `define DEFAULT_MINDRV        2'd2
+`define DEFAULT_B2WFRAME      6'd9
+`define DEFAULT_W2BFRAME      6'd9
+`define DEFAULT_FASTG_B2GFRAME 6'd2
+`define DEFAULT_FASTG_W2GFRAME 6'd2
 
 //`define USE_BLUE_NOISE  // Use blue noise instead of bayer
 
