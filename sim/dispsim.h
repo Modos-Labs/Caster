@@ -22,7 +22,7 @@
 //
 #pragma once
 
-//#define DES
+//#define K3
 #define MONO
 
 constexpr int DISP_WIDTH = 320;

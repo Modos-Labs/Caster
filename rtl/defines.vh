@@ -1,3 +1,4 @@
+`include "build_config.vh"
 
 `define OP_INIT             2'd0 // Initial power up
 `define OP_NORMAL           2'd1 // Normal operation
@@ -69,8 +70,6 @@
 `define SETMODE_FAST_GREY                  8'd5
 `define SETMODE_AUTO_LUT_NO_DITHER         8'd6
 `define SETMODE_AUTO_LUT_BLUE_NOISE        8'd7
-
-//`define OUTPUT_16B
 
 // Define this to enable operation by default after reset
 // Used for debugging purpose only

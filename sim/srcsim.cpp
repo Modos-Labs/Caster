@@ -44,7 +44,7 @@ void print_buffer(uint8_t *buf, size_t bytes) {
 }
 
 static uint8_t rgb2y(uint32_t r, uint32_t g, uint32_t b, int x, int y) {
-#ifdef DES
+#ifdef K3
     int c = (x + (DISP_HEIGHT - y)) % 3;
     if (c == 0)
         return r;

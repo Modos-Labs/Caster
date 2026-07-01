@@ -22,7 +22,7 @@ module bayer_dithering (
     input wire [2:0]  y_pos
     /* verilator lint_on UNUSEDSIGNAL */
 );
-    parameter COLORMODE = "DES";
+    parameter COLORMODE = "K3";
 
     wire [3:0] vo_ordered;
     wire [3:0] b0, b1, b2, b3;
@@ -50,7 +50,7 @@ module bayer_dithering (
             (y_pos[1:0] == 2'b10) ? (4'd1) :
                                     (-4'd3);
     end
-    else if (COLORMODE == "DES") begin: gen_des_dither
+    else if (COLORMODE == "K3") begin: gen_k3_dither
         assign b0 =
             (y_pos[2:0] == 3'd0) ? ((x_pos[1:0] == 3'd0) ? (-4'd7) : (x_pos[1:0] == 3'd1) ? ( 4'd7) : ( 4'd0)) :
             (y_pos[2:0] == 3'd1) ? ((x_pos[1:0] == 3'd0) ? (-4'd7) : (x_pos[1:0] == 3'd1) ? ( 4'd0) : ( 4'd0)) :

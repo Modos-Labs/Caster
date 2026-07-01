@@ -12,6 +12,7 @@
 // Glider top-level
 `default_nettype none
 `timescale 1ns / 1ps
+`include "../defines.vh"
 
 module top(
     // Global clock input
@@ -66,7 +67,7 @@ module top(
     output wire LED
     );
     
-    parameter COLORMODE = "MONO";
+    parameter COLORMODE = `CASTER_COLORMODE;
     
     parameter SIMULATION = "FALSE";
     parameter CALIB_SOFT_IP = "TRUE";

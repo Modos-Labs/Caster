@@ -20,7 +20,7 @@ module blue_noise_dithering #(
     input wire [31:0]               vin,
     output reg [OUTPUT_BITS*4-1:0]  vout,
     input wire [3:0]                x_pos,
-    input wire [1:0]                x_pos_sel, // Use only in DES
+    input wire [1:0]                x_pos_sel, // Use only in K3
     input wire [5:0]                y_pos
 );
 
@@ -43,7 +43,7 @@ module blue_noise_dithering #(
     reg [1:0] addr_lo_3;
     
     generate
-/*    if (COLORMODE == "DES") begin: gen_des_addr_lo
+/*    if (COLORMODE == "K3") begin: gen_k3_addr_lo
         always @(*) begin
             if (x_pos_sel == 2'd0) begin
                 addr_lo_0 = 2'd0;

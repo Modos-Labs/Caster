@@ -2,10 +2,14 @@
 
 set -e
 
+variant="${1:-8bit-mono}"
+
 if [ -z "${XILINX:-}" ]; then
     source /opt/Xilinx/14.7/ISE_DS/settings64.sh
 fi
 source clean.sh
+
+./write_build_config.sh "$variant" ../../build_config.vh
 
 mkdir -p "../synth/__projnav" > ise_flow_results.txt
 mkdir -p "../synth/xst" >> ise_flow_results.txt

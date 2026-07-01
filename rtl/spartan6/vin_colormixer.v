@@ -9,7 +9,7 @@
 // PARTICULAR PURPOSE. Please see the CERN-OHL-P v2 for applicable conditions
 //
 // vin_colormixer.v
-// Process input color depending on the screen type (mono, kaleido, des etc.) 
+// Process input color depending on the screen type (mono, Kaleido 3, etc.)
 `timescale 1ns / 1ps
 `default_nettype none
 module vin_colormixer(
@@ -40,8 +40,8 @@ module vin_colormixer(
         rgb2y rgb2y_odd (.r(r_odd), .g(g_odd), .b(b_odd), .y(y_odd));
         rgb2y rgb2y_even (.r(r_even), .g(g_even), .b(b_even), .y(y_even));
     end
-    else if (COLORMODE == "DES") begin: gen_color_mixer
-        // Processing for DES
+    else if (COLORMODE == "K3") begin: gen_color_mixer
+        // Processing for Kaleido 3
         reg [1:0] c_cnt_x;
         reg [1:0] c_cnt_y;
         reg hs_last;
@@ -74,7 +74,7 @@ module vin_colormixer(
                 end
             end
         end
-        // DES
+        // Kaleido 3
 //        assign y_odd[7:2] = (c_cnt_x == 2'd0) ? (b_odd) :
 //                (c_cnt_x == 2'd1) ? (r_odd) : (g_odd);
 //        assign y_even[7:2] = (c_cnt_x == 2'd0) ? (r_even) :

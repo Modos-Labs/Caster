@@ -69,7 +69,7 @@ module caster(
 
     /* verilator lint_off UNUSEDPARAM */
     // Only used if bayer dithering is selected
-    parameter COLORMODE = "MONO";
+    parameter COLORMODE = `CASTER_COLORMODE;
     /* verilator lint_on UNUSEDPARAM */
 
     // Screen timing
@@ -463,7 +463,7 @@ module caster(
     wire [5:0] bn_y_pos;
 
     generate
-    if (COLORMODE == "DES") begin: gen_des_counter
+    if (COLORMODE == "K3") begin: gen_k3_counter
         reg [1:0] v_cnt_mod_3;
         reg [1:0] h_cnt_mod_3;
         reg [3:0] h_cnt_div_3;
@@ -511,7 +511,7 @@ module caster(
         assign by_y_pos = scan_v_cnt[2:0];
     end
     
-    if ((COLORMODE == "DES") || (COLORMODE == "MONO")) begin: gen_mono_ypos
+    if ((COLORMODE == "K3") || (COLORMODE == "MONO")) begin: gen_mono_ypos
         assign bn_y_pos = scan_v_cnt[5:0];
     end
     else if (COLORMODE == "RGBW") begin: gen_rgbw_ypos
@@ -744,7 +744,8 @@ module caster(
     // End of pipeline
     wire clk_en = (scan_in_hfp || scan_in_hsync || scan_in_hact);
 
-`ifdef OUTPUT_16B
+generate
+if (`CASTER_OUTPUT_WIDTH == 16) begin: gen_output_16b
     reg out_clk;
     reg [7:0] last_pix;
     reg [15:0] out_sd;
@@ -769,7 +770,8 @@ module caster(
     assign epd_sdclk = out_clk;
     assign epd_sd = out_sd;
     assign epd_sdce0 = out_sdce;
-`else
+end
+else begin: gen_output_8b
     // Clock output
     `ifdef SIMULATION
         assign epd_sdclk = ~clk;
@@ -793,7 +795,8 @@ module caster(
 
     assign epd_sd = {8'd0, current_pixel}; // In 8-bit mode, only use lower 8-bit
     assign epd_sdce0 = (scan_in_act) ? 1'b0 : 1'b1;
-`endif
+end
+endgenerate
 
     // mode
     //assign epd_gdoe = (scan_in_vsync || scan_in_vbp || scan_in_vact) ? 1'b1 : 1'b0;

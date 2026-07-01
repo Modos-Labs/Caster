@@ -72,7 +72,7 @@ void dispsim_set_pixel(uint32_t *pixels, int x, int y, uint8_t input) {
     speedbuf[y * DISP_WIDTH + x] = speed;
 #endif
 
-#ifdef DES
+#ifdef K3
     int c = (x_counter + (DISP_HEIGHT - y_counter)) % 3;
     if (c == 0)
         pixel = 0xff000000 | (pixel << 16);
