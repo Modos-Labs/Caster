@@ -54,6 +54,10 @@ Vcaster *core;
 VerilatedVcdC *trace;
 uint64_t tickcount;
 
+static constexpr int OSD_WIDTH = 320;
+static constexpr int OSD_HEIGHT = 200;
+static constexpr int OSD_BUF_SIZE = OSD_WIDTH * OSD_HEIGHT / 8;
+
 // Legacy function required by some platforms/ versions of Verilator
 double sc_time_stamp() { return 0; }
 
@@ -74,11 +78,11 @@ void testmain(void) {
 
         // Enable OSD
         spi_write_reg16(CSR_OSD_LEFT, 0);
-        spi_write_reg16(CSR_OSD_RIGHT, 256/4);
+        spi_write_reg16(CSR_OSD_RIGHT, OSD_WIDTH / 4);
         spi_write_reg16(CSR_OSD_TOP, 0);
-        spi_write_reg16(CSR_OSD_BOTTOM, 128);
+        spi_write_reg16(CSR_OSD_BOTTOM, OSD_HEIGHT);
         spi_write_reg16(CSR_OSD_ADDR, 0);
-        for (int i = 0; i < 4096; i++) {
+        for (int i = 0; i < OSD_BUF_SIZE; i++) {
             spi_write_reg8(CSR_OSD_WR, 0x55);
         }
         spi_write_reg8(CSR_OSD_EN, 1);

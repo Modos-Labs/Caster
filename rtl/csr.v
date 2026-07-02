@@ -31,7 +31,7 @@ module csr(
     output reg [11:0] csr_osd_right,
     output reg [11:0] csr_osd_top,
     output reg [11:0] csr_osd_bottom,
-    output reg [11:0] csr_osd_addr,
+    output reg [12:0] csr_osd_addr,
     output reg [7:0] csr_osd_wr,
     output reg csr_osd_we,
     output reg [11:0] csr_op_left,
@@ -246,7 +246,7 @@ module csr(
                 `CSR_OSD_TOP_LO: csr_osd_top[7:0] <= spi_req_wdata;
                 `CSR_OSD_BOTTOM_HI: csr_osd_bottom[11:8] <= spi_req_wdata[3:0];
                 `CSR_OSD_BOTTOM_LO: csr_osd_bottom[7:0] <= spi_req_wdata;
-                `CSR_OSD_ADDR_HI: csr_osd_addr[11:8] <= spi_req_wdata[3:0];
+                `CSR_OSD_ADDR_HI: csr_osd_addr[12:8] <= spi_req_wdata[4:0];
                 `CSR_OSD_ADDR_LO: csr_osd_addr[7:0] <= spi_req_wdata;
                 `CSR_OSD_WR: begin
                     csr_osd_wr <= spi_req_wdata;

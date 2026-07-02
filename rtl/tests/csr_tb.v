@@ -27,7 +27,7 @@ module csr_tb;
     wire [11:0] csr_osd_right;
     wire [11:0] csr_osd_top;
     wire [11:0] csr_osd_bottom;
-    wire [11:0] csr_osd_addr;
+    wire [12:0] csr_osd_addr;
     wire [7:0] csr_osd_wr;
     wire csr_osd_we;
     wire [11:0] csr_op_left;
@@ -166,6 +166,21 @@ module csr_tb;
         end
     endtask
 
+    task spi_write_reg8;
+        input [7:0] addr;
+        input [7:0] value;
+        reg [7:0] ignored;
+        begin
+            spi_cs = 1'b0;
+            spi_transfer(addr, ignored);
+            repeat (2) @(posedge clk);
+            spi_transfer(value, ignored);
+            spi_cs = 1'b1;
+            spi_sck = 1'b1;
+            repeat (2) @(posedge clk);
+        end
+    endtask
+
     reg [7:0] read_value;
 
     initial begin
@@ -189,6 +204,12 @@ module csr_tb;
         expect8(read_value, 8'hab, "damage counter middle byte readback");
         spi_read_reg8(`CSR_DAMAGE_COUNT_LO, read_value);
         expect8(read_value, 8'hcd, "damage counter low byte readback");
+
+        spi_write_reg8(`CSR_OSD_ADDR_HI, 8'h1f);
+        spi_write_reg8(`CSR_OSD_ADDR_LO, 8'hff);
+        if (csr_osd_addr !== 13'h1fff) begin
+            fail("13-bit OSD address write");
+        end
 
         $display("csr_tb completed at time %0t", $time);
         $finish;

@@ -88,6 +88,9 @@ module caster(
     localparam VS_DELAY = 8; // wait 8 clocks after VS is vaild
     localparam PIPELINE_DELAY = 4;
     localparam AUTOLUT_QUIET_FRAMES = 6'd60;
+    localparam OSD_WIDTH = 320;
+    localparam OSD_STRIDE_BYTES = OSD_WIDTH / 8;
+    localparam OSD_ADDR_WIDTH = 13;
 
     // Control status registers
     wire [5:0] csr_lut_frame;
@@ -99,7 +102,7 @@ module caster(
     wire [11:0] csr_osd_right;
     wire [11:0] csr_osd_top;
     wire [11:0] csr_osd_bottom;
-    wire [11:0] csr_osd_addr;
+    wire [OSD_ADDR_WIDTH-1:0] csr_osd_addr;
     wire [7:0] csr_osd_wr;
     wire csr_osd_we;
     wire [1:0] csr_mindrv;
@@ -187,13 +190,13 @@ module caster(
     /* verilator lint_on width */
 
     // OSD overlay RAM
-    wire [11:0] osd_rd_addr;
+    wire [OSD_ADDR_WIDTH-1:0] osd_rd_addr;
     wire [7:0] osd_rd;
 
-    // Single 4KB block RAM, use port A for read and port B for write
-    // Resolution is fixed 256x128 @ 1bpp
+    // 8KB block RAM, use port A for read and port B for write.
+    // Resolution is fixed 320x200 @ 1bpp, with 192 unused bytes.
     mu_ram_2rw #(
-        .AW(12),
+        .AW(OSD_ADDR_WIDTH),
         .DW(8)
     ) bramdp0 (
         .clka(clk),
@@ -466,12 +469,18 @@ module caster(
         end
     endgenerate
 
-    // OSD: 12 bit address, 256x128 size, each byte has 8 pixels -> 32x128
+    // OSD: 13 bit address, 320x200 size, each byte has 8 pixels -> 40x200
     /* verilator lint_off width */
-    wire [6:0] osd_ram_y_offset = v_cnt_offset - osd_top;
-    wire [4:0] osd_ram_x_offset = h_cnt_offset[10:1] - osd_left;
+    wire [7:0] osd_ram_y_offset = v_cnt_offset - osd_top;
+    wire [5:0] osd_ram_x_offset = h_cnt_offset[10:1] - osd_left;
     /* verilator lint_on width */
-    assign osd_rd_addr = {osd_ram_y_offset, osd_ram_x_offset};
+    osd_addr #(
+        .OSD_STRIDE_BYTES(OSD_STRIDE_BYTES)
+    ) osd_addr (
+        .y(osd_ram_y_offset),
+        .x_byte(osd_ram_x_offset),
+        .addr(osd_rd_addr)
+    );
     wire s1_osd_valid =
         osd_en &&
         ({1'b0, h_cnt_offset} >= osd_left) && ({1'b0, h_cnt_offset} < osd_right) &&
