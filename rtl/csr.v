@@ -34,6 +34,7 @@ module csr(
     output reg [12:0] csr_osd_addr,
     output reg [7:0] csr_osd_wr,
     output reg csr_osd_we,
+    output reg csr_osd_scale_2x,
     output reg [11:0] csr_op_left,
     output reg [11:0] csr_op_right,
     output reg [11:0] csr_op_top,
@@ -165,6 +166,7 @@ module csr(
             csr_lut_we <= 1'b0;
             csr_op_en <= 1'b0;
             csr_osd_en <= 1'b0;
+            csr_osd_scale_2x <= 1'b0;
             csr_cfg_mindrv <= `DEFAULT_MINDRV;
             csr_cfg_b2wframe <= `DEFAULT_B2WFRAME;
             csr_cfg_w2bframe <= `DEFAULT_W2BFRAME;
@@ -257,6 +259,7 @@ module csr(
                 `CSR_CFG_W2BFRAME: csr_cfg_w2bframe <= spi_req_wdata[5:0];
                 `CSR_CFG_FASTG_B2GFRAME: csr_cfg_fastg_b2gframe <= spi_req_wdata[5:0];
                 `CSR_CFG_FASTG_W2GFRAME: csr_cfg_fastg_w2gframe <= spi_req_wdata[5:0];
+                `CSR_OSD_SCALE: csr_osd_scale_2x <= spi_req_wdata[0];
                 default: begin
                     // no op
                 end

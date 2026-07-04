@@ -105,6 +105,7 @@ module caster(
     wire [OSD_ADDR_WIDTH-1:0] csr_osd_addr;
     wire [7:0] csr_osd_wr;
     wire csr_osd_we;
+    wire csr_osd_scale_2x;
     wire [1:0] csr_mindrv;
     wire [5:0] csr_b2wframe;
     wire [5:0] csr_w2bframe;
@@ -147,6 +148,7 @@ module caster(
         .csr_osd_addr(csr_osd_addr),
         .csr_osd_wr(csr_osd_wr),
         .csr_osd_we(csr_osd_we),
+        .csr_osd_scale_2x(csr_osd_scale_2x),
         .csr_op_left(csr_op_left),
         .csr_op_right(csr_op_right),
         .csr_op_top(csr_op_top),
@@ -272,6 +274,7 @@ module caster(
     reg [11:0] osd_right;
     reg [11:0] osd_top;
     reg [11:0] osd_bottom;
+    reg osd_scale_2x;
     always @(posedge clk) begin
         if (vsync_trigger) begin // Use the same trigger
             osd_en <= csr_osd_en;
@@ -279,9 +282,11 @@ module caster(
             osd_right <= csr_osd_right;
             osd_top <= csr_osd_top;
             osd_bottom <= csr_osd_bottom;
+            osd_scale_2x <= csr_osd_scale_2x;
         end
         if (rst) begin
             osd_en <= 1'b0;
+            osd_scale_2x <= 1'b0;
         end
     end
 
@@ -471,14 +476,15 @@ module caster(
 
     // OSD: 13 bit address, 320x200 size, each byte has 8 pixels -> 40x200
     /* verilator lint_off width */
-    wire [7:0] osd_ram_y_offset = v_cnt_offset - osd_top;
-    wire [5:0] osd_ram_x_offset = h_cnt_offset[10:1] - osd_left;
+    wire [8:0] osd_ram_y_offset = v_cnt_offset - osd_top;
+    wire [7:0] osd_ram_x_offset = h_cnt_offset - osd_left;
     /* verilator lint_on width */
     osd_addr #(
         .OSD_STRIDE_BYTES(OSD_STRIDE_BYTES)
     ) osd_addr (
         .y(osd_ram_y_offset),
-        .x_byte(osd_ram_x_offset),
+        .x_group(osd_ram_x_offset),
+        .scale_2x(osd_scale_2x),
         .addr(osd_rd_addr)
     );
     wire s1_osd_valid =
@@ -489,9 +495,11 @@ module caster(
     // Move to next stage
     reg [3:0] s2_op_valid;
     reg s2_osd_valid;
+    reg [1:0] s2_osd_x_group_offset_2x;
     always @(posedge clk) begin
         s2_op_valid <= s1_op_valid;
         s2_osd_valid <= s1_osd_valid;
+        s2_osd_x_group_offset_2x <= osd_ram_x_offset[1:0];
     end
 
 
@@ -501,7 +509,17 @@ module caster(
         s2_active <= s1_active;
 
     // OSD overlay
-    wire [3:0] s2_osd_overlay = h_cnt_offset[0] ? osd_rd[7:4] : osd_rd[3:0];
+    wire [10:0] s2_osd_x_group_offset = h_cnt_offset - osd_left[10:0];
+    wire [3:0] s2_osd_overlay_1x = s2_osd_x_group_offset[0] ?
+            osd_rd[7:4] : osd_rd[3:0];
+    wire [3:0] s2_osd_overlay_2x;
+    osd_overlay_expand osd_overlay_expand (
+        .osd_byte(osd_rd),
+        .x_group(s2_osd_x_group_offset_2x),
+        .overlay_2x(s2_osd_overlay_2x)
+    );
+    wire [3:0] s2_osd_overlay = osd_scale_2x ? s2_osd_overlay_2x :
+            s2_osd_overlay_1x;
     wire [31:0] s2_osd_overlay_y8 = {{8{s2_osd_overlay[3]}},
         {8{s2_osd_overlay[2]}}, {8{s2_osd_overlay[1]}}, {8{s2_osd_overlay[0]}}};
     wire [31:0] s2_vin_overlayed = s2_osd_valid ? s2_osd_overlay_y8 :

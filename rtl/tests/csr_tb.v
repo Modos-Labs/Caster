@@ -30,6 +30,7 @@ module csr_tb;
     wire [12:0] csr_osd_addr;
     wire [7:0] csr_osd_wr;
     wire csr_osd_we;
+    wire csr_osd_scale_2x;
     wire [11:0] csr_op_left;
     wire [11:0] csr_op_right;
     wire [11:0] csr_op_top;
@@ -78,6 +79,7 @@ module csr_tb;
         .csr_osd_addr(csr_osd_addr),
         .csr_osd_wr(csr_osd_wr),
         .csr_osd_we(csr_osd_we),
+        .csr_osd_scale_2x(csr_osd_scale_2x),
         .csr_op_left(csr_op_left),
         .csr_op_right(csr_op_right),
         .csr_op_top(csr_op_top),
@@ -209,6 +211,18 @@ module csr_tb;
         spi_write_reg8(`CSR_OSD_ADDR_LO, 8'hff);
         if (csr_osd_addr !== 13'h1fff) begin
             fail("13-bit OSD address write");
+        end
+
+        if (csr_osd_scale_2x !== 1'b0) begin
+            fail("OSD scale reset default");
+        end
+        spi_write_reg8(`CSR_OSD_SCALE, 8'h01);
+        if (csr_osd_scale_2x !== 1'b1) begin
+            fail("OSD scale write one");
+        end
+        spi_write_reg8(`CSR_OSD_SCALE, 8'h02);
+        if (csr_osd_scale_2x !== 1'b0) begin
+            fail("OSD scale write uses bit zero");
         end
 
         $display("csr_tb completed at time %0t", $time);
