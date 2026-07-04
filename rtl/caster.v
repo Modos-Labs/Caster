@@ -106,6 +106,9 @@ module caster(
     wire [7:0] csr_osd_wr;
     wire csr_osd_we;
     wire csr_osd_scale_2x;
+    wire [7:0] csr_tone_addr;
+    wire [7:0] csr_tone_wr;
+    wire csr_tone_we;
     wire [1:0] csr_mindrv;
     wire [5:0] csr_b2wframe;
     wire [5:0] csr_w2bframe;
@@ -149,6 +152,9 @@ module caster(
         .csr_osd_wr(csr_osd_wr),
         .csr_osd_we(csr_osd_we),
         .csr_osd_scale_2x(csr_osd_scale_2x),
+        .csr_tone_addr(csr_tone_addr),
+        .csr_tone_wr(csr_tone_wr),
+        .csr_tone_we(csr_tone_we),
         .csr_op_left(csr_op_left),
         .csr_op_right(csr_op_right),
         .csr_op_top(csr_op_top),
@@ -616,16 +622,35 @@ module caster(
 
     assign s2_vin_selected = mirror_en ? s2_vin_mirrored : s2_vin_overlayed;
 
+    wire [31:0] s2_vin_toned;
+    tone_adjust_y8 tone_adjust_y8 (
+        .clk(clk),
+        .i_pixel(s2_vin_selected),
+        .o_pixel(s2_vin_toned),
+        .tone_addr(csr_tone_addr),
+        .tone_wr(csr_tone_wr),
+        .tone_we(csr_tone_we)
+    );
+
+    reg [63:0] s2a_bi_pixel;
+    reg [3:0] s2a_op_valid;
+    reg s2a_active;
+    always @(posedge clk) begin
+        s2a_bi_pixel <= bi_pixel;
+        s2a_op_valid <= s2_op_valid;
+        s2a_active <= s2_active;
+    end
+
     // Slice Y8 version downto Y4
-    wire [15:0] s2_vin_selected_y4 = {s2_vin_selected[31:28],
-        s2_vin_selected[23:20], s2_vin_selected[15:12], s2_vin_selected[7:4]};
+    wire [15:0] s2_vin_toned_y4 = {s2_vin_toned[31:28],
+        s2_vin_toned[23:20], s2_vin_toned[15:12], s2_vin_toned[7:4]};
 
     // Degamma
     wire [31:0] s2_pixel_linear;
     generate
         for (i = 0; i < 4; i = i + 1) begin: gen_degamma
             degamma degamma (
-                .in(s2_vin_selected[i*8+2 +: 6]),
+                .in(s2_vin_toned[i*8+2 +: 6]),
                 .out(s2_pixel_linear[i*8 +: 8])
             );
         end
@@ -672,15 +697,15 @@ module caster(
     reg [15:0] s3_vin_pixel;
     reg [3:0] s3_op_valid;
     always @(posedge clk) begin
-        s3_vin_pixel <= s2_vin_selected_y4;
-        s3_bi_pixel <= bi_pixel;
-        s3_op_valid <= s2_op_valid;
+        s3_vin_pixel <= s2_vin_toned_y4;
+        s3_bi_pixel <= s2a_bi_pixel;
+        s3_op_valid <= s2a_op_valid;
     end
 
     // STAGE 3
     reg s3_active;
     always @(posedge clk)
-        s3_active <= s2_active;
+        s3_active <= s2a_active;
 
     // Waveform lookup here
     // Waveform structure:

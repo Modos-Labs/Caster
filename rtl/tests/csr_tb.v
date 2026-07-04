@@ -31,6 +31,9 @@ module csr_tb;
     wire [7:0] csr_osd_wr;
     wire csr_osd_we;
     wire csr_osd_scale_2x;
+    wire [7:0] csr_tone_addr;
+    wire [7:0] csr_tone_wr;
+    wire csr_tone_we;
     wire [11:0] csr_op_left;
     wire [11:0] csr_op_right;
     wire [11:0] csr_op_top;
@@ -80,6 +83,9 @@ module csr_tb;
         .csr_osd_wr(csr_osd_wr),
         .csr_osd_we(csr_osd_we),
         .csr_osd_scale_2x(csr_osd_scale_2x),
+        .csr_tone_addr(csr_tone_addr),
+        .csr_tone_wr(csr_tone_wr),
+        .csr_tone_we(csr_tone_we),
         .csr_op_left(csr_op_left),
         .csr_op_right(csr_op_right),
         .csr_op_top(csr_op_top),
@@ -223,6 +229,18 @@ module csr_tb;
         spi_write_reg8(`CSR_OSD_SCALE, 8'h02);
         if (csr_osd_scale_2x !== 1'b0) begin
             fail("OSD scale write uses bit zero");
+        end
+
+        spi_write_reg8(`CSR_TONE_ADDR, 8'h10);
+        spi_write_reg8(`CSR_TONE_WR, 8'ha5);
+        if (csr_tone_wr !== 8'ha5) begin
+            fail("tone LUT write data");
+        end
+        if (csr_tone_we !== 1'b0) begin
+            fail("tone LUT write enable clears");
+        end
+        if (csr_tone_addr !== 8'h11) begin
+            fail("tone LUT address auto-increment");
         end
 
         $display("csr_tb completed at time %0t", $time);

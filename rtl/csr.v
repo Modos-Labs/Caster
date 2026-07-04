@@ -35,6 +35,9 @@ module csr(
     output reg [7:0] csr_osd_wr,
     output reg csr_osd_we,
     output reg csr_osd_scale_2x,
+    output reg [7:0] csr_tone_addr,
+    output reg [7:0] csr_tone_wr,
+    output reg csr_tone_we,
     output reg [11:0] csr_op_left,
     output reg [11:0] csr_op_right,
     output reg [11:0] csr_op_top,
@@ -164,6 +167,8 @@ module csr(
         if (rst) begin
             csr_lut_frame <= 6'd38; // Needs to match default waveform
             csr_lut_we <= 1'b0;
+            csr_tone_addr <= 8'd0;
+            csr_tone_we <= 1'b0;
             csr_op_en <= 1'b0;
             csr_osd_en <= 1'b0;
             csr_osd_scale_2x <= 1'b0;
@@ -196,6 +201,10 @@ module csr(
             if (csr_osd_we) begin
                 csr_osd_we <= 1'b0;
                 csr_osd_addr <= csr_osd_addr + 'd1;
+            end
+            if (csr_tone_we) begin
+                csr_tone_we <= 1'b0;
+                csr_tone_addr <= csr_tone_addr + 'd1;
             end
             csr_op_en <= 1'b0;
             if (spi_req_wen) begin
@@ -260,6 +269,11 @@ module csr(
                 `CSR_CFG_FASTG_B2GFRAME: csr_cfg_fastg_b2gframe <= spi_req_wdata[5:0];
                 `CSR_CFG_FASTG_W2GFRAME: csr_cfg_fastg_w2gframe <= spi_req_wdata[5:0];
                 `CSR_OSD_SCALE: csr_osd_scale_2x <= spi_req_wdata[0];
+                `CSR_TONE_ADDR: csr_tone_addr <= spi_req_wdata;
+                `CSR_TONE_WR: begin
+                    csr_tone_wr <= spi_req_wdata;
+                    csr_tone_we <= 1'b1;
+                end
                 default: begin
                     // no op
                 end
@@ -271,6 +285,7 @@ module csr(
     assign spi_autoinc =
         (spi_req_addr != `CSR_LUT_WR) &&
         (spi_req_addr != `CSR_OSD_WR) &&
+        (spi_req_addr != `CSR_TONE_WR) &&
         (spi_req_addr != `CSR_OP_CMD);
 
 endmodule

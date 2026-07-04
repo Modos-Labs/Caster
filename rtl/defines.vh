@@ -52,6 +52,8 @@
 `define CSR_CFG_FASTG_B2GFRAME 8'd46
 `define CSR_CFG_FASTG_W2GFRAME 8'd47
 `define CSR_OSD_SCALE       8'd48
+`define CSR_TONE_ADDR       8'd49
+`define CSR_TONE_WR         8'd50
 `define CSR_STATUS          8'd128
 `define CSR_ID0             8'd129
 `define CSR_DAMAGE_COUNT_HI 8'd130
