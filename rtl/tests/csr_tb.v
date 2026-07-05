@@ -59,6 +59,7 @@ module csr_tb;
     wire [5:0] csr_cfg_fastg_w2gframe;
     wire csr_mirror_en;
     wire csr_blank_input;
+    wire [7:0] csr_input_ctrl;
     wire dbg_spi_req_wen;
     wire [7:0] dbg_spi_req_addr;
     wire [7:0] dbg_spi_req_wdata;
@@ -111,34 +112,42 @@ module csr_tb;
         .csr_cfg_fastg_w2gframe(csr_cfg_fastg_w2gframe),
         .csr_mirror_en(csr_mirror_en),
         .csr_blank_input(csr_blank_input),
+        .csr_input_ctrl(csr_input_ctrl),
         .sys_ready(1'b1),
         .mig_error(1'b0),
         .mif_error(1'b0),
         .op_busy(1'b0),
         .op_queue(1'b0),
         .csr_damage_counter(21'h1abcd),
+        .input_status(8'ha5),
+        .input_meas_hact(12'h678),
+        .input_meas_vact(12'h345),
+        .input_meas_htotal(12'habc),
+        .input_meas_vtotal(12'hdef),
+        .debug_memif_state(8'h5a),
+        .debug_fifo_state(8'hc3),
         .dbg_spi_req_wen(dbg_spi_req_wen),
         .dbg_spi_req_addr(dbg_spi_req_addr),
         .dbg_spi_req_wdata(dbg_spi_req_wdata)
     );
 
     task fail;
-        input [255:0] message;
+        input [511:0] message;
         begin
             $display("FAIL: %0s at time %0t", message, $time);
-            $finish;
+            $fatal(1);
         end
     endtask
 
     task expect8;
         input [7:0] actual;
         input [7:0] expected;
-        input [255:0] message;
+        input [511:0] message;
         begin
             if (actual !== expected) begin
                 $display("FAIL: %0s expected 0x%02x got 0x%02x at time %0t",
                     message, expected, actual, $time);
-                $finish;
+                $fatal(1);
             end
         end
     endtask
@@ -212,6 +221,37 @@ module csr_tb;
         expect8(read_value, 8'hab, "damage counter middle byte readback");
         spi_read_reg8(`CSR_DAMAGE_COUNT_LO, read_value);
         expect8(read_value, 8'hcd, "damage counter low byte readback");
+
+        if (csr_input_ctrl !== 8'h01) begin
+            fail("input control reset defaults to forced internal");
+        end
+        spi_write_reg8(`CSR_INPUT_CTRL, 8'h0a);
+        if (csr_input_ctrl !== 8'h0a) begin
+            fail("input control write");
+        end
+
+        spi_read_reg8(`CSR_INPUT_STATUS, read_value);
+        expect8(read_value, 8'ha5, "input status readback");
+        spi_read_reg8(`CSR_INPUT_MEAS_HACT_HI, read_value);
+        expect8(read_value, 8'h06, "input measured hact high");
+        spi_read_reg8(`CSR_INPUT_MEAS_HACT_LO, read_value);
+        expect8(read_value, 8'h78, "input measured hact low");
+        spi_read_reg8(`CSR_INPUT_MEAS_VACT_HI, read_value);
+        expect8(read_value, 8'h03, "input measured vact high");
+        spi_read_reg8(`CSR_INPUT_MEAS_VACT_LO, read_value);
+        expect8(read_value, 8'h45, "input measured vact low");
+        spi_read_reg8(`CSR_INPUT_MEAS_HTOT_HI, read_value);
+        expect8(read_value, 8'h0a, "input measured htotal high");
+        spi_read_reg8(`CSR_INPUT_MEAS_HTOT_LO, read_value);
+        expect8(read_value, 8'hbc, "input measured htotal low");
+        spi_read_reg8(`CSR_INPUT_MEAS_VTOT_HI, read_value);
+        expect8(read_value, 8'h0d, "input measured vtotal high");
+        spi_read_reg8(`CSR_INPUT_MEAS_VTOT_LO, read_value);
+        expect8(read_value, 8'hef, "input measured vtotal low");
+        spi_read_reg8(`CSR_DEBUG_MEMIF_STATE, read_value);
+        expect8(read_value, 8'h5a, "memif debug state readback");
+        spi_read_reg8(`CSR_DEBUG_FIFO_STATE, read_value);
+        expect8(read_value, 8'hc3, "fifo debug state readback");
 
         spi_write_reg8(`CSR_OSD_ADDR_HI, 8'h1f);
         spi_write_reg8(`CSR_OSD_ADDR_LO, 8'hff);

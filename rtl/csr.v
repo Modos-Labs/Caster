@@ -63,6 +63,7 @@ module csr(
     output reg [5:0] csr_cfg_fastg_w2gframe,
     output reg csr_mirror_en,
     output reg csr_blank_input,
+    output reg [7:0] csr_input_ctrl,
     // Status input
     input wire sys_ready,
     input wire mig_error,
@@ -70,6 +71,13 @@ module csr(
     input wire op_busy,
     input wire op_queue,
     input wire [20:0] csr_damage_counter,
+    input wire [7:0] input_status,
+    input wire [11:0] input_meas_hact,
+    input wire [11:0] input_meas_vact,
+    input wire [11:0] input_meas_htotal,
+    input wire [11:0] input_meas_vtotal,
+    input wire [7:0] debug_memif_state,
+    input wire [7:0] debug_fifo_state,
     // Debug
     output wire dbg_spi_req_wen,
     output wire [7:0] dbg_spi_req_addr,
@@ -161,6 +169,17 @@ module csr(
         (spi_req_addr == `CSR_DAMAGE_COUNT_HI) ? {3'd0, csr_damage_counter[20:16]} :
         (spi_req_addr == `CSR_DAMAGE_COUNT_MID) ? csr_damage_counter[15:8] :
         (spi_req_addr == `CSR_DAMAGE_COUNT_LO) ? csr_damage_counter[7:0] :
+        (spi_req_addr == `CSR_INPUT_STATUS) ? input_status :
+        (spi_req_addr == `CSR_INPUT_MEAS_HACT_HI) ? {4'd0, input_meas_hact[11:8]} :
+        (spi_req_addr == `CSR_INPUT_MEAS_HACT_LO) ? input_meas_hact[7:0] :
+        (spi_req_addr == `CSR_INPUT_MEAS_VACT_HI) ? {4'd0, input_meas_vact[11:8]} :
+        (spi_req_addr == `CSR_INPUT_MEAS_VACT_LO) ? input_meas_vact[7:0] :
+        (spi_req_addr == `CSR_INPUT_MEAS_HTOT_HI) ? {4'd0, input_meas_htotal[11:8]} :
+        (spi_req_addr == `CSR_INPUT_MEAS_HTOT_LO) ? input_meas_htotal[7:0] :
+        (spi_req_addr == `CSR_INPUT_MEAS_VTOT_HI) ? {4'd0, input_meas_vtotal[11:8]} :
+        (spi_req_addr == `CSR_INPUT_MEAS_VTOT_LO) ? input_meas_vtotal[7:0] :
+        (spi_req_addr == `CSR_DEBUG_MEMIF_STATE) ? debug_memif_state :
+        (spi_req_addr == `CSR_DEBUG_FIFO_STATE) ? debug_fifo_state :
         8'd0;
 
     always @(posedge clk or posedge rst) begin
@@ -172,6 +191,7 @@ module csr(
             csr_op_en <= 1'b0;
             csr_osd_en <= 1'b0;
             csr_osd_scale_2x <= 1'b0;
+            csr_input_ctrl <= 8'h01;
             csr_cfg_mindrv <= `DEFAULT_MINDRV;
             csr_cfg_b2wframe <= `DEFAULT_B2WFRAME;
             csr_cfg_w2bframe <= `DEFAULT_W2BFRAME;
@@ -274,6 +294,7 @@ module csr(
                     csr_tone_wr <= spi_req_wdata;
                     csr_tone_we <= 1'b1;
                 end
+                `CSR_INPUT_CTRL: csr_input_ctrl <= spi_req_wdata;
                 default: begin
                     // no op
                 end

@@ -50,7 +50,15 @@ module memif(
     input  wire         mig_rd_overflow, // unused
     input  wire [6:0]   mig_rd_count, // unused
     // Error
-    output wire         error
+    output wire         error,
+    // Debug / handoff status
+    output wire         rd_idle,
+    output wire         wr_idle,
+    output wire         issue_idle,
+    output wire [1:0]   rd_state_dbg,
+    output wire [2:0]   wr_state_dbg,
+    output wire         mig_rd_empty_dbg,
+    output wire         mig_wr_empty_dbg
     );
 
     localparam BYTE_PER_WORD = 16; // 128 bit bus
@@ -244,6 +252,15 @@ module memif(
     assign mig_cmd_bl = BURST_LENGTH - 1;
     
     assign error = 1'b0;
+
+    assign rd_idle = (rd_state == RD_IDLE);
+    assign wr_idle = (wr_state == WR_IDLE);
+    assign issue_idle = (issue_state == ISSUE_WAIT) && !mig_cmd_en &&
+            !rd_issue_req && !wr_issue_req;
+    assign rd_state_dbg = rd_state;
+    assign wr_state_dbg = wr_state;
+    assign mig_rd_empty_dbg = mig_rd_empty;
+    assign mig_wr_empty_dbg = mig_wr_empty;
 
 endmodule
 `default_nettype wire

@@ -54,11 +54,23 @@
 `define CSR_OSD_SCALE       8'd48
 `define CSR_TONE_ADDR       8'd49
 `define CSR_TONE_WR         8'd50
+`define CSR_INPUT_CTRL      8'd51
 `define CSR_STATUS          8'd128
 `define CSR_ID0             8'd129
 `define CSR_DAMAGE_COUNT_HI 8'd130
 `define CSR_DAMAGE_COUNT_MID 8'd131
 `define CSR_DAMAGE_COUNT_LO 8'd132
+`define CSR_INPUT_STATUS        8'd133
+`define CSR_INPUT_MEAS_HACT_HI  8'd134
+`define CSR_INPUT_MEAS_HACT_LO  8'd135
+`define CSR_INPUT_MEAS_VACT_HI  8'd136
+`define CSR_INPUT_MEAS_VACT_LO  8'd137
+`define CSR_INPUT_MEAS_HTOT_HI  8'd138
+`define CSR_INPUT_MEAS_HTOT_LO  8'd139
+`define CSR_INPUT_MEAS_VTOT_HI  8'd140
+`define CSR_INPUT_MEAS_VTOT_LO  8'd141
+`define CSR_DEBUG_MEMIF_STATE   8'd142
+`define CSR_DEBUG_FIFO_STATE    8'd143
 
 // FB operations
 // Redraw:

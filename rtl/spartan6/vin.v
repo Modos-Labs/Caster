@@ -15,6 +15,12 @@
 `default_nettype none
 module vin(
     input  wire         rst,
+    input  wire         clk_internal,
+    input  wire         rst_internal,
+    input  wire [2:0]   source_select,
+    input  wire         source_reset,
+    input  wire [11:0]  exp_hact,
+    input  wire [11:0]  exp_vact,
     // DPI signals
     input  wire         dpi_vsync,
     input  wire         dpi_hsync,
@@ -34,6 +40,22 @@ module vin(
     output wire [31:0]  v_pixel, // 4 pixels per clock, Y8
     output wire         v_valid,
     input  wire         v_ready,
+    output wire         dpi_stable,
+    output wire         dpi_supported,
+    output wire [11:0]  dpi_meas_hact,
+    output wire [11:0]  dpi_meas_vact,
+    output wire [11:0]  dpi_meas_htotal,
+    output wire [11:0]  dpi_meas_vtotal,
+    output wire         fpdlink_stable,
+    output wire         fpdlink_supported,
+    output wire [11:0]  fpdlink_meas_hact,
+    output wire [11:0]  fpdlink_meas_vact,
+    output wire [11:0]  fpdlink_meas_htotal,
+    output wire [11:0]  fpdlink_meas_vtotal,
+    output wire         dpi_vsync_raw,
+    output wire         fpdlink_vsync_raw,
+    output wire         vi_fifo_full,
+    output wire         vi_fifo_empty,
     output wire [7:0]   debug
 );
 
@@ -100,16 +122,64 @@ module vin(
             v_dpi_pixel[11:6], v_dpi_pixel[11:10],
             v_dpi_pixel[5:0], v_dpi_pixel[5:4]};
 
-    // Mux between 2 inputs into the 1:2 FIFO
-    // Prioritize FPD Link Input
-    wire vi_select = v_fpdlink_valid;
-    //wire vi_select = 1'b1; // Always use FPD Link
+    localparam SRC_INTERNAL = 3'd0;
+    localparam SRC_DPI = 3'd1;
+    localparam SRC_FPDLINK = 3'd2;
+
+    wire selected_internal = (source_select == SRC_INTERNAL);
+    wire selected_dpi = (source_select == SRC_DPI);
+    wire selected_fpdlink = (source_select == SRC_FPDLINK);
+    wire selected_live = selected_dpi || selected_fpdlink;
+
+    assign dpi_vsync_raw = v_dpi_vsync;
+    assign fpdlink_vsync_raw = v_fpdlink_vsync;
+
+    video_timing_monitor dpi_monitor (
+        .clk(v_dpi_pclk),
+        .rst(rst),
+        .lock(v_dpi_valid),
+        .vsync(v_dpi_vsync),
+        .hsync(v_dpi_hsync),
+        .de(v_dpi_de),
+        .exp_hact(exp_hact),
+        .exp_vact(exp_vact),
+        .stable(dpi_stable),
+        .supported(dpi_supported),
+        .meas_hact(dpi_meas_hact),
+        .meas_vact(dpi_meas_vact),
+        .meas_htotal(dpi_meas_htotal),
+        .meas_vtotal(dpi_meas_vtotal),
+        .stable_frames()
+    );
+
+    video_timing_monitor fpdlink_monitor (
+        .clk(v_fpdlink_pclk),
+        .rst(rst),
+        .lock(v_fpdlink_valid),
+        .vsync(v_fpdlink_vsync),
+        .hsync(v_fpdlink_hsync),
+        .de(v_fpdlink_de),
+        .exp_hact(exp_hact),
+        .exp_vact(exp_vact),
+        .stable(fpdlink_stable),
+        .supported(fpdlink_supported),
+        .meas_hact(fpdlink_meas_hact),
+        .meas_vact(fpdlink_meas_vact),
+        .meas_htotal(fpdlink_meas_htotal),
+        .meas_vtotal(fpdlink_meas_vtotal),
+        .stable_frames()
+    );
+
+    // Mux between 2 live inputs into the 1:2 FIFO.
+    wire vi_select = selected_fpdlink;
     wire vi_vsync = vi_select ? v_fpdlink_vsync : v_dpi_vsync;
     wire vi_hsync = vi_select ? v_fpdlink_hsync : v_dpi_hsync; // HSYNC not used
     wire vi_de = vi_select ? v_fpdlink_de : v_dpi_de;
     wire [47:0] vi_pixel_rgb = vi_select ? v_fpdlink_pixel : v_dpi_pixel_rgb888;
     wire fifo_full;
     wire fifo_empty;
+    assign vi_fifo_full = fifo_full;
+    assign vi_fifo_empty = fifo_empty;
 
     // Input clock mux
     wire vi_pclk;
@@ -145,16 +215,26 @@ module vin(
 //    assign debug[6] = dpi_pixel[11];
 //    assign debug[7] = dpi_pixel[10];
     assign debug[7:0] = 0;
-    // Output clock mux
-    BUFGMUX oclk_mux (
+    // Live output clock mux
+    wire live_halfpclk;
+    BUFGMUX live_oclk_mux (
         .S(vi_select),
         .I0(v_dpi_halfpclk),
         .I1(v_fpdlink_halfpclk),
+        .O(live_halfpclk)
+    );
+
+    // EPDC clock source mux. The design boots with the internal source selected.
+    BUFGMUX source_oclk_mux (
+        .S(selected_live),
+        .I0(clk_internal),
+        .I1(live_halfpclk),
         .O(v_pclk)
     );
 
     wire [15:0] lr_pixel;
     wire lr_pixel_en;
+    wire [31:0] fifo_pixel;
     /*line_reverse line_reverse(
         .clk(vi_pclk),
         .rst(rst),
@@ -164,28 +244,34 @@ module vin(
         .pix_out_en(lr_pixel_en)
     );*/
 
+    wire live_vsync_sync;
+    wire vi_fifo_rst = rst | rst_internal | source_reset |
+            (selected_live && live_vsync_sync);
+
     vi_fifo vi_fifo (
-        .rst(v_vsync), // input rst, reset at each frame
+        .rst(vi_fifo_rst), // input rst, reset at each live frame
         // Write port
         .wr_clk(vi_pclk), // input wr_clk
         .din(vi_pixel), // input [7 : 0] din
-        .wr_en(vi_wr_en), // input wr_en
+        .wr_en(selected_live && vi_wr_en), // input wr_en
         .full(fifo_full), // output full, error
         // Read port
         .rd_clk(v_pclk), // input rd_clk
-        .rd_en(v_ready), // input rd_en
-        .dout(v_pixel), // output [15 : 0] dout
+        .rd_en(selected_live && v_ready), // input rd_en
+        .dout(fifo_pixel), // output [31 : 0] dout
         .empty(fifo_empty) // output empty
     );
 
-    assign v_valid = !fifo_empty;
+    assign v_valid = selected_internal ? 1'b1 : !fifo_empty;
+    assign v_pixel = selected_internal ? 32'hffffffff : fifo_pixel;
 
     // Sync vs signal to clk_sys clock domain
     mu_dsync vs_sync (
         .iclk(vi_pclk),
         .in(vi_vsync),
         .oclk(v_pclk),
-        .out(v_vsync)
+        .out(live_vsync_sync)
     );
+    assign v_vsync = selected_internal ? 1'b1 : live_vsync_sync;
 
 endmodule

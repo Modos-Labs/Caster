@@ -52,11 +52,23 @@ module caster(
     output wire         spi_miso,
     // Control / Status
     output wire         b_trigger, // Trigger VRAM operation
+    input  wire         stop_new_frame,
     input  wire         sys_ready, // Power OK, DDR calibration done, etc.
     input  wire         mig_error,
     input  wire         mif_error,
     output wire [23:0]  frame_bytes,
     output wire         global_en,
+    output wire         frame_done,
+    output wire [11:0]  cfg_hact,
+    output wire [11:0]  cfg_vact,
+    output wire [7:0]   input_ctrl,
+    input  wire [7:0]   input_status,
+    input  wire [11:0]  input_meas_hact,
+    input  wire [11:0]  input_meas_vact,
+    input  wire [11:0]  input_meas_htotal,
+    input  wire [11:0]  input_meas_vtotal,
+    input  wire [7:0]   debug_memif_state,
+    input  wire [7:0]   debug_fifo_state,
     // Debug output
     output wire [15:0]  dbg_wvfm_tgt,
     output wire [1:0]   dbg_scan_state,
@@ -180,6 +192,7 @@ module caster(
         .csr_cfg_fastg_w2gframe(csr_fastg_w2gframe),
         .csr_mirror_en(mirror_en),
         .csr_blank_input(blank_input),
+        .csr_input_ctrl(input_ctrl),
         // Status input
         .sys_ready(sys_ready),
         .mig_error(mig_error),
@@ -187,6 +200,13 @@ module caster(
         .op_busy(op_valid),
         .op_queue(op_pending),
         .csr_damage_counter(damage_counter_last),
+        .input_status(input_status),
+        .input_meas_hact(input_meas_hact),
+        .input_meas_vact(input_meas_vact),
+        .input_meas_htotal(input_meas_htotal),
+        .input_meas_vtotal(input_meas_vtotal),
+        .debug_memif_state(debug_memif_state),
+        .debug_fifo_state(debug_fifo_state),
         .dbg_spi_req_wen(dbg_spi_req_wen),
         .dbg_spi_req_addr(dbg_spi_req_addr),
         .dbg_spi_req_wdata(dbg_spi_req_wdata)
@@ -324,7 +344,7 @@ module caster(
     always @(posedge clk) begin
         case (scan_state)
         SCAN_IDLE: begin
-            if (sys_ready && global_en && vin_vsync) begin
+            if (sys_ready && global_en && vin_vsync && !stop_new_frame) begin
                 scan_state <= SCAN_WAITING;
             end
             scan_h_cnt <= 0;
@@ -936,8 +956,13 @@ else begin: gen_output_8b
         );
     `endif
 
+    reg out_sdce;
+    always @(posedge clk) begin
+        out_sdce <= (scan_in_act) ? 1'b0 : 1'b1;
+    end
+
     assign epd_sd = {8'd0, current_pixel}; // In 8-bit mode, only use lower 8-bit
-    assign epd_sdce0 = (scan_in_act) ? 1'b0 : 1'b1;
+    assign epd_sdce0 = out_sdce;
 end
 endgenerate
 
@@ -961,6 +986,10 @@ endgenerate
     assign epd_sdle = (scan_in_hsync) ? 1'b1 : 1'b0;
 
     assign b_trigger = (scan_state == SCAN_WAITING);
+    assign frame_done = (scan_state == SCAN_RUNNING) &&
+            (scan_h_cnt == htotal - 1) && (scan_v_cnt == vtotal - 1);
+    assign cfg_hact = hact;
+    assign cfg_vact = vact;
 
     assign dbg_scan_state = scan_state;
     assign dbg_scan_h_cnt = scan_h_cnt;
